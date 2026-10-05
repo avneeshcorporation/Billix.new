@@ -1,0 +1,2218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billix - Professional Invoice Generator</title>
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#013A0E">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;600;800&display=swap"
+        rel="stylesheet">
+    <!-- jsPDF and AutoTable libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @media print {
+            @page {
+                size: A4;
+                margin: 0;
+            }
+
+            body.is-printing * {
+                visibility: hidden !important;
+            }
+
+            body.is-printing #printContainer,
+            body.is-printing #printContainer * {
+                visibility: visible !important;
+            }
+
+            #printContainer {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 210mm !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+                z-index: 99999 !important;
+            }
+
+            .invoice-container {
+                transform: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+                width: 210mm !important;
+                height: 297mm !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+
+            .invoice-grid {
+                border: 0.3mm solid #1e40af !important;
+            }
+
+            table {
+                width: 100% !important;
+                table-layout: fixed !important;
+                border-collapse: collapse !important;
+            }
+
+            td,
+            th {
+                overflow: hidden !important;
+                word-wrap: break-word !important;
+            }
+
+            /* Reset colors for print */
+            .theme-blue {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+
+        #printContainer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 210mm;
+            height: auto;
+            background: white;
+            z-index: -10000;
+            visibility: hidden;
+            overflow: hidden;
+        }
+
+        body.is-printing #printContainer {
+            visibility: visible !important;
+            display: block !important;
+            z-index: 99999 !important;
+        }
+
+        body.is-printing #printContainer * {
+            visibility: visible !important;
+            transform: none !important;
+            box-shadow: none !important;
+            animation: none !important;
+        }
+
+        /* Ensure blue borders stay blue in print */
+        body.is-printing .main-invoice-table,
+        body.is-printing .main-invoice-table td,
+        body.is-printing .preview-product-table th,
+        body.is-printing .preview-product-table td {
+            border-color: #1e40af !important;
+        }
+
+        body.is-printing .invoice-title {
+            color: #1e40af !important;
+        }
+    </style>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="printContainer"></div>
+
+
+    <!-- Dynamic Floating Background -->
+    <ul class="dynamic-background">
+        <li></li>
+        <li></li>
+        <li></li>
+        <li></li>
+        <li></li>
+        <li></li>
+        <li></li>
+        <li></li>
+        <li></li>
+        <li></li>
+    </ul>
+
+
+
+    <div class="app-container">
+        <!-- Minimalist Rich Text Formatting Toolbar -->
+
+        <!-- Header Section -->
+        <div class="main-layout">
+            <!-- Sidebar Navigation -->
+            <nav class="sidebar" id="sidebar">
+                <div class="sidebar-header-toggle">
+                    <button id="sidebarToggle" class="sidebar-toggle-btn" title="Toggle Sidebar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                            <line x1="3" y1="12" x2="21" y2="12"></line>
+                            <line x1="3" y1="6" x2="21" y2="6"></line>
+                            <line x1="3" y1="18" x2="21" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="sidebar-menu">
+                    <button class="sidebar-btn active" data-view="home" title="Home">
+                        <span class="icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" width="1.2rem" height="1.2rem">
+                                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                            </svg>
+                        </span>
+                        <span class="btn-text">Home</span>
+                    </button>
+                    <button class="sidebar-btn" data-view="dashboard" title="Dashboard">
+                        <span class="icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" width="1.2rem" height="1.2rem">
+                                <rect width="7" height="9" x="3" y="3" rx="1"></rect>
+                                <rect width="7" height="5" x="14" y="3" rx="1"></rect>
+                                <rect width="7" height="9" x="14" y="12" rx="1"></rect>
+                                <rect width="7" height="5" x="3" y="16" rx="1"></rect>
+                            </svg>
+                        </span>
+                        <span class="btn-text">Dashboard</span>
+                    </button>
+                    <button class="sidebar-btn" data-view="create" title="Create Invoice">
+                        <span class="icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" width="1.2rem" height="1.2rem">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="12" x2="12" y1="18" y2="12"></line>
+                                <line x1="9" x2="15" y1="15" y2="15"></line>
+                            </svg>
+                        </span>
+                        <span class="btn-text">Create Invoice</span>
+                    </button>
+                    <button class="sidebar-btn" data-view="ledger" title="Ledger Management">
+                        <span class="icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" width="1.2rem" height="1.2rem">
+                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                            </svg>
+                        </span>
+                        <span class="btn-text">Ledgers</span>
+                    </button>
+                    <button class="sidebar-btn" data-view="pdf-downloads" title="PDF Download Requests">
+                        <span class="icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" width="1.2rem" height="1.2rem">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                        </span>
+                        <span class="btn-text">PDF Downloads</span>
+                    </button>
+                    <button class="sidebar-btn" onclick="window.open('https://ewaybillgst.gov.in/login.aspx', '_blank')"
+                        title="Generate EWAY Bill">
+                        <span class="icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" width="1.2rem" height="1.2rem">
+                                <line x1="3" y1="22" x2="21" y2="22"></line>
+                                <line x1="6" y1="18" x2="6" y2="11"></line>
+                                <line x1="10" y1="18" x2="10" y2="11"></line>
+                                <line x1="14" y1="18" x2="14" y2="11"></line>
+                                <line x1="18" y1="18" x2="18" y2="11"></line>
+                                <polygon points="12 2 20 7 4 7 12 2"></polygon>
+                            </svg>
+                        </span>
+                        <span class="btn-text">EWAY Bill</span>
+                    </button>
+                    <button class="sidebar-btn" data-view="help" title="Help & Support">
+                        <span class="icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" width="1.2rem" height="1.2rem">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                <line x1="12" x2="12.01" y1="17" y2="17"></line>
+                            </svg>
+                        </span>
+                        <span class="btn-text">Help</span>
+                    </button>
+                    <button class="sidebar-btn" data-view="profile" title="User Profile">
+                        <span class="icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" width="1.2rem" height="1.2rem">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                        </span>
+                        <span class="btn-text">Profile</span>
+                    </button>
+                </div>
+                <div class="sidebar-footer">
+                    <p class="footer-full">Billix v2.0</p>
+                    <p class="footer-mini">V2</p>
+                </div>
+            </nav>
+
+            <main class="content-area">
+                <header class="app-header">
+                    <div class="logo-container" style="display: flex; align-items: center; gap: 0.8rem;">
+                        <svg class="company-logo" width="55" height="55" viewBox="0 0 100 100" fill="none"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <!-- Base Slot -->
+                            <rect x="25" y="80" width="55" height="8" rx="4" fill="#013A0E" />
+                            <!-- Back Paper (Darkest) -->
+                            <path d="M22 35 Q28 65 32 80 L62 80 Q59 55 64 32 Z" fill="#116D08" />
+                            <!-- Middle Paper -->
+                            <path d="M33 32 Q36 60 38 80 L72 80 Q73 55 84 38 Z" fill="#299E13" />
+                            <!-- Front Paper (Lightest, with notches) -->
+                            <path
+                                d="M43 38 C43 38 46 45 52 46 C57 47 62 44 62 44 L87 54 C87 54 83 60 81 65 C79 71 85 75 85 75 Q75 80 72 82 L42 82 Q48 65 43 38 Z"
+                                fill="#A8EB66" />
+                        </svg>
+                        <div>
+                            <h1 class="company-name" style="color: var(--primary);">BILLIX</h1>
+                            <p class="tagline"
+                                style="color: var(--primary-light); font-size: 0.85rem; font-weight: 600;">Where
+                                Billing Meets Efficiency</p>
+                        </div>
+                    </div>
+                    <div class="action-buttons" style="display: flex; gap: 10px; align-items: center;">
+                        <button id="darkModeBtn" type="button" class="btn btn-secondary"
+                            style="padding: 0.5rem; display: flex; align-items: center; justify-content: center; border-radius: 50%;">
+                            <span id="darkModeIcon"
+                                style="display: flex; align-items: center; justify-content: center;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round" width="1.1rem" height="1.1rem">
+                                    <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+                                </svg>
+                            </span>
+                        </button>
+                        <button id="logoutBtn" type="button" class="btn btn-secondary"
+                            style="padding: 0.5rem; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #ef4444;"
+                            title="Logout">
+                            <span style="display: flex; align-items: center; justify-content: center;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round" width="1.1rem" height="1.1rem">
+                                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                    <polyline points="16 17 21 12 16 7"></polyline>
+                                    <line x1="21" x2="9" y1="12" y2="12"></line>
+                                </svg>
+                            </span>
+                        </button>
+                        <div class="dropdown">
+                            <button id="downloadBtn" type="button" class="btn btn-primary dropdown-toggle">
+                                Download PDF <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round" width="12" height="12"
+                                    style="margin-left: 5px;">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </button>
+                            <div id="downloadMenu" class="dropdown-menu">
+                                <button type="button" class="dropdown-item" data-copy="ORIGINAL FOR RECIPIENT">Original
+                                    for
+                                    Recipient</button>
+                                <button type="button" class="dropdown-item"
+                                    data-copy="DUPLICATE FOR TRANSPORTER">Duplicate for
+                                    Transporter</button>
+                                <button type="button" class="dropdown-item" data-copy="SUPPLIER COPY">Supplier
+                                    Copy</button>
+                                <hr class="dropdown-divider">
+                                <button type="button" class="dropdown-item" data-copy="ALL">Combined PDF (All 3
+                                    Copies)</button>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Home View -->
+                <div id="homeView" class="view-section">
+                    <section class="hero-section card">
+                        <div class="hero-content">
+                            <h1 class="hero-title">Create Professional Invoices in Seconds with <span
+                                    class="accent-text">Billix</span></h1>
+                            <p class="hero-subtitle">The ultimate GST compliant invoicing tool for modern businesses.
+                                Fast, simple, and reliable.</p>
+                            <div class="hero-actions">
+                                <button class="btn btn-primary btn-lg" onclick="switchView('create')">🚀 Create
+                                    Invoice</button>
+                                <button class="btn btn-secondary btn-lg" onclick="switchView('dashboard')">📊 Go to
+                                    Dashboard</button>
+                            </div>
+                        </div>
+                        <div class="hero-illustration">
+                            <svg width="300" height="200" viewBox="0 0 100 100">
+                                <rect x="10" y="20" width="80" height="60" rx="4" fill="var(--card-bg)"
+                                    stroke="var(--accent)" stroke-width="2" />
+                                <line x1="20" y1="35" x2="80" y2="35" stroke="var(--accent)" stroke-width="2"
+                                    stroke-linecap="round" />
+                                <line x1="20" y1="45" x2="50" y2="45" stroke="var(--text-muted)" stroke-width="1"
+                                    stroke-linecap="round" />
+                                <line x1="20" y1="55" x2="60" y2="55" stroke="var(--text-muted)" stroke-width="1"
+                                    stroke-linecap="round" />
+                                <circle cx="80" cy="70" r="10" fill="var(--accent)" fill-opacity="0.2" />
+                                <text x="75" y="74" font-family="Arial" font-size="12" fill="var(--accent)">✓</text>
+                            </svg>
+                        </div>
+                    </section>
+
+                    <!-- Image Slider Section -->
+                    <section class="image-slider-section card" style="padding: 0; overflow: hidden; margin-top: 1rem;">
+                        <div class="slider-container" id="promoSlider">
+                            <div class="slider-wrapper">
+                                <img src="promo1.png" alt="Promo 1" class="slider-img">
+                                <img src="promo2.png" alt="Promo 2" class="slider-img">
+                                <img src="promo3.png" alt="Promo 3" class="slider-img">
+                            </div>
+                            <div class="slider-dots" id="sliderDots">
+                                <span class="dot active"></span>
+                                <span class="dot"></span>
+                                <span class="dot"></span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Promotional Video Section -->
+                    <section class="promo-video-section card"
+                        style="margin-top: 1rem; margin-bottom: 1.5rem; padding: 2rem;">
+                        <div class="video-header" style="text-align: center; margin-bottom: 1.5rem;">
+                            <h2 class="section-title center"
+                                style="font-size: 1.5rem; justify-content: center; border: none; margin-bottom: 0.5rem;">
+                                See Billix in Action</h2>
+                            <p class="section-subtitle" style="color: var(--text-muted); font-size: 0.95rem;">Watch how
+                                easy it is to generate GST-ready invoices in seconds.</p>
+                        </div>
+                        <div class="video-wrapper"
+                            style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 16px; box-shadow: 0 15px 35px rgba(0,0,0,0.15); border: 1px solid var(--accent); background: #000;">
+                            <iframe
+                                src="https://www.youtube-nocookie.com/embed/P2K-RqOZZlw"
+                                title="Billix in Action"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                referrerpolicy="strict-origin-when-cross-origin"
+                                allowfullscreen
+                                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; background: #000;">
+                            </iframe>
+
+                            <!-- Custom glowing effect behind the video for premium look -->
+                            <div
+                                style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(108,180,44,0.15) 0%, transparent 60%); z-index: -1; pointer-events: none;">
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="features-grid">
+                        <div class="feature-card card">
+                            <div class="feature-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round" width="32" height="32">
+                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                                </svg>
+                            </div>
+                            <h3>Easy Creation</h3>
+                            <p>Generate professional GST-ready invoices in less than a minute.</p>
+                        </div>
+                        <div class="feature-card card">
+                            <div class="feature-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round" width="32" height="32">
+                                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z">
+                                    </path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                    <line x1="10" y1="9" x2="8" y2="9"></line>
+                                </svg>
+                            </div>
+                            <h3>GST Compliant</h3>
+                            <p>All calculations are handled automatically according to GST norms.</p>
+                        </div>
+                        <div class="feature-card card">
+                            <div class="feature-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round" width="32" height="32">
+                                    <line x1="12" y1="20" x2="12" y2="10"></line>
+                                    <line x1="18" y1="20" x2="18" y2="4"></line>
+                                    <line x1="6" y1="20" x2="6" y2="16"></line>
+                                </svg>
+                            </div>
+                            <h3>Smart Reports</h3>
+                            <p>Track your business performance with dynamic dashboard metrics.</p>
+                        </div>
+                        <div class="feature-card card">
+                            <div class="feature-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round" width="32" height="32">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="8" y1="13" x2="16" y2="13"></line>
+                                    <line x1="8" y1="17" x2="16" y2="17"></line>
+                                    <line x1="10" y1="9" x2="8" y2="9"></line>
+                                </svg>
+                            </div>
+                            <h3>Excel Export</h3>
+                            <p>Download your invoice history directly to Excel for easy auditing.</p>
+                        </div>
+                    </section>
+
+                    <section class="how-it-works card">
+                        <h2 class="section-title center">How It Works</h2>
+                        <div class="steps-container">
+                            <div class="step">
+                                <div class="step-num">1</div>
+                                <h4>Create</h4>
+                                <p>Fill in details and add your products.</p>
+                            </div>
+                            <div class="step">
+                                <div class="step-num">2</div>
+                                <h4>Save</h4>
+                                <p>Invoices are stored automatically in your history.</p>
+                            </div>
+                            <div class="step">
+                                <div class="step-num">3</div>
+                                <h4>Track</h4>
+                                <p>Monitor totals and filters via Dashboard.</p>
+                            </div>
+                            <div class="step">
+                                <div class="step-num">4</div>
+                                <h4>Export</h4>
+                                <p>Download comprehensive Excel reports.</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="benefits-section">
+                        <div class="benefit-card card">
+                            <h3>Why Choose Billix?</h3>
+                            <ul>
+                                <li><strong>Save Time:</strong> Stop struggling with complex spreadsheets.</li>
+                                <li><strong>Reduce Errors:</strong> Automated tax calculations prevent mistakes.</li>
+                                <li><strong>Centralized Data:</strong> All your invoices in one secure local place.</li>
+                                <li><strong>Professional Branding:</strong> Impress clients with clean, modern invoices.
+                                </li>
+                            </ul>
+                        </div>
+                    </section>
+
+                    <section class="cta-final card">
+                        <h2>Start Managing Your Invoices Today</h2>
+                        <p>Join thousands of businesses using Billix for efficient billing.</p>
+                        <div class="hero-actions" style="justify-content: center; margin-top: 2rem;">
+                            <button class="btn btn-primary" onclick="switchView('create')">Create My First
+                                Invoice</button>
+                        </div>
+                    </section>
+
+                    <footer class="home-footer">
+                        <p>Billix v2.0 - Where Billing Meets Efficiency</p>
+                        <div class="footer-links">
+                            <a href="#" onclick="switchView('help')">Help & Support</a>
+                            <span class="dot">·</span>
+                            <a href="#">Terms of Use</a>
+                        </div>
+                    </footer>
+                </div>
+
+                <!-- Dashboard View -->
+                <div id="dashboardView" class="view-section hidden">
+                    <div class="dashboard-header">
+                        <h1 class="dashboard-title">My Dashboard</h1>
+                    </div>
+
+                    <div class="summary-section">
+                        <div class="summary-card">
+                            <h3>Total Invoices</h3>
+                            <div id="totalInvoicesCount" class="summary-value">0</div>
+                            <p>Generated till date</p>
+                        </div>
+                    </div>
+
+                    <div class="filters-card card">
+                        <h2 class="section-title">Filter Invoices</h2>
+                        <div class="filters-grid">
+                            <div class="input-group">
+                                <label>Bill To Name</label>
+                                <select id="filterBillToName" class="dashboard-filter">
+                                    <option value="">All Buyers</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Ship To Name</label>
+                                <select id="filterShipToName" class="dashboard-filter">
+                                    <option value="">All Destinations</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Bill To GSTIN</label>
+                                <select id="filterBillToGST" class="dashboard-filter">
+                                    <option value="">All GSTINs</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Ship To GSTIN</label>
+                                <select id="filterShipToGST" class="dashboard-filter">
+                                    <option value="">All GSTINs</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Bill To State</label>
+                                <select id="filterBillToState" class="dashboard-filter">
+                                    <option value="">All States</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Ship To State</label>
+                                <select id="filterShipToState" class="dashboard-filter">
+                                    <option value="">All States</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Year</label>
+                                <select id="filterYear" class="dashboard-filter">
+                                    <option value="">All Years</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Month</label>
+                                <select id="filterMonth" class="dashboard-filter">
+                                    <option value="">All Months</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div
+                            style="text-align: right; margin-top: 10px; display: flex; justify-content: flex-end; gap: 10px;">
+                            <button id="resetFilters" class="btn btn-secondary btn-sm">Reset Filters</button>
+                            <button id="btnDownloadExcel" class="btn btn-primary btn-sm"
+                                style="display: flex; align-items: center; gap: 5px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                Download Excel
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="records-card card">
+                        <h2 class="section-title">Invoice Records</h2>
+                        <div class="table-wrapper">
+                            <table id="dashboardTable">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Invoice No</th>
+                                        <th>Bill To Name</th>
+                                        <th>Total Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dashboardTableBody">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Help View -->
+                <div id="helpView" class="view-section hidden">
+                    <div class="dashboard-header help-header">
+                        <h1 class="dashboard-title">Help & Support</h1>
+                        <p class="section-subtitle">Need assistance? Post your query and track its status below.</p>
+                    </div>
+
+                    <div class="action-bar" style="margin-bottom: 2rem;">
+                        <button id="btnOpenQueryForm" class="btn btn-primary"
+                            style="display: flex; align-items: center; gap: 8px;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="16"></line>
+                                <line x1="8" y1="12" x2="16" y2="12"></line>
+                            </svg>
+                            Post Your Query
+                        </button>
+                    </div>
+
+                    <div class="records-card card">
+                        <h2 class="section-title">My Queries</h2>
+                        <div id="queryListContainer" class="query-list">
+                            <!-- Queries will be loaded here -->
+                            <div class="empty-state">
+                                <p>No queries posted yet.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Create Invoice View -->
+                <div id="createInvoiceView" class="view-section hidden">
+                    <div class="workspace">
+                        <!-- Left Pane: Input Form -->
+                        <aside class="form-pane">
+                            <form id="invoiceForm">
+                                <!-- Invoice Location and Company -->
+                                <section class="card" style="margin-bottom: 1rem; background: var(--card-bg); border: 2px solid var(--accent);">
+                                    <div class="grid-2">
+                                      <div class="input-group">
+                                        <label for="invoiceLocation" style="color: var(--primary); font-size: 1.1rem; font-weight: 700;">e-Invoice Location</label>
+                                        <select id="invoiceLocation" class="state-selector" style="font-weight: 600; padding: 0.75rem; border-color: var(--accent); background: var(--bg-color);">
+                                            <option value="indore" selected>Indore</option>
+                                            <option value="pune">Pune (AVNEESH CORPORATION)</option>
+                                        </select>
+                                      </div>
+                                      <div class="input-group">
+                                        <label for="invoiceCompany" style="color: var(--primary); font-size: 1.1rem; font-weight: 700;">Company</label>
+                                        <select id="invoiceCompany" class="company-selector" style="font-weight: 600; padding: 0.75rem; border-color: var(--accent); background: var(--bg-color);"></select>
+                                      </div>
+                                    </div>
+                                </section>
+
+                                <!-- Seller Details Section -->
+                                <section class="card">
+                                    <h2 class="section-title">Seller Details</h2>
+                                    <div class="grid-2">
+                                        <div class="input-group">
+                                            <label for="sellerName">Company Name</label>
+                                            <div id="sellerName" class="rich-editable single-line"
+                                                contenteditable="true" data-sync="seller-name">AVNEESH CORPORATION</div>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="dispatchFrom">Dispatch From</label>
+                                            <div id="dispatchFrom" class="rich-editable single-line"
+                                                contenteditable="true" data-sync="dispatch-from">Khalapur Dist. Raigad
+                                                Maharashtra (410203)</div>
+                                        </div>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="sellerAddress">Address</label>
+                                        <div id="sellerAddress" class="rich-editable multiline" contenteditable="true"
+                                            data-sync="seller-address">Plot No.44 Survey No.25/3/2, Sanwer Main Road
+                                            Sanwer Main
+                                            Choraha , Sanwer , Indore (453551)</div>
+                                    </div>
+                                    <div class="grid-2">
+                                        <div class="input-group">
+                                            <label for="sellerGST">GSTIN NO</label>
+                                            <div id="sellerGST" class="rich-editable single-line" contenteditable="true"
+                                                data-sync="seller-gst">23CAEPR5751F1ZQ</div>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="sellerState">State Name</label>
+                                            <select id="sellerState" class="state-selector"
+                                                data-target="sellerStateCode">
+                                                <option value="">Select State</option>
+                                                <option value="01">Jammu & Kashmir</option>
+                                                <option value="02">Himachal Pradesh</option>
+                                                <option value="03">Punjab</option>
+                                                <option value="04">Chandigarh</option>
+                                                <option value="05">Uttarakhand</option>
+                                                <option value="06">Haryana</option>
+                                                <option value="07">Delhi</option>
+                                                <option value="08">Rajasthan</option>
+                                                <option value="09">Uttar Pradesh</option>
+                                                <option value="10">Bihar</option>
+                                                <option value="11">Sikkim</option>
+                                                <option value="12">Arunachal Pradesh</option>
+                                                <option value="13">Nagaland</option>
+                                                <option value="14">Manipur</option>
+                                                <option value="15">Mizoram</option>
+                                                <option value="16">Tripura</option>
+                                                <option value="17">Meghalaya</option>
+                                                <option value="18">Assam</option>
+                                                <option value="19">West Bengal</option>
+                                                <option value="20">Jharkhand</option>
+                                                <option value="21">Odisha</option>
+                                                <option value="22">Chhattisgarh</option>
+                                                <option value="23" selected>Madhya Pradesh</option>
+                                                <option value="24">Gujarat</option>
+                                                <option value="25">Daman & Diu</option>
+                                                <option value="26">Dadra & Nagar Haveli</option>
+                                                <option value="27">Maharashtra</option>
+                                                <option value="29">Karnataka</option>
+                                                <option value="30">Goa</option>
+                                                <option value="31">Lakshadweep</option>
+                                                <option value="32">Kerala</option>
+                                                <option value="33">Tamil Nadu</option>
+                                                <option value="34">Puducherry</option>
+                                                <option value="35">Andaman & Nicobar Islands</option>
+                                                <option value="36">Telangana</option>
+                                                <option value="37">Andhra Pradesh</option>
+                                                <option value="38">Ladakh</option>
+                                                <option value="97">Other Territory</option>
+                                            </select>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="sellerStateCode">State Code</label>
+                                            <div id="sellerStateCode" class="rich-editable single-line"
+                                                contenteditable="true" data-sync="seller-state">23</div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <!-- Invoice & Transport Info -->
+                                <section class="card">
+                                    <h2 class="section-title">Invoice & Transport</h2>
+                                    <div class="grid-2">
+                                        <div class="input-group">
+                                            <label for="invoiceNo">Invoice No </label>
+                                            <div id="invoiceNo" class="rich-editable single-line" contenteditable="true"
+                                                data-sync="invoice-no">AC/25-26/28</div>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="invoiceDate">Invoice Date</label>
+                                            <input type="date" id="invoiceDate" data-sync="invoice-date">
+                                        </div>
+                                    </div>
+                                    <div class="grid-3">
+                                        <div class="input-group" style="grid-column: span 2;">
+                                            <label for="transportName">Transport Name</label>
+                                            <div id="transportName" class="rich-editable single-line"
+                                                contenteditable="true" data-sync="transport-name"></div>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="lorryNo">Lorry no</label>
+                                            <div id="lorryNo" class="rich-editable single-line" contenteditable="true"
+                                                data-sync="lorry-no"></div>
+                                        </div>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="biltyNo">Bilty No</label>
+                                        <div id="biltyNo" class="rich-editable single-line" contenteditable="true"
+                                            data-sync="bilty-no"></div>
+                                    </div>
+                                </section>
+
+                                <!-- Buyer Details -->
+                                <section class="card">
+                                    <div class="flex" style="align-items: center; margin-bottom: 0.5rem;">
+                                        <h2 class="section-title" style="margin-bottom: 0; border-bottom: none;">Bill To
+                                            / Ship To
+                                        </h2>
+                                        <div class="checkbox-container">
+                                            <input type="checkbox" id="sameAsBillTo" checked>
+                                            <label for="sameAsBillTo">Same as Bill</label>
+                                        </div>
+                                    </div>
+
+                                    <div class="grid-2">
+                                        <div class="left-col">
+                                            <div class="input-group">
+                                                <label for="buyerName">Bill To Name</label>
+                                                <div id="buyerName" class="rich-editable single-line"
+                                                    contenteditable="true" data-sync="bill-to-name"></div>
+                                            </div>
+                                            <div class="input-group">
+                                                <label for="buyerAddress">Bill To Address</label>
+                                                <div id="buyerAddress" class="rich-editable multiline"
+                                                    contenteditable="true" data-sync="bill-to-address"></div>
+                                            </div>
+                                        </div>
+                                        <div class="right-col">
+                                            <div class="input-group">
+                                                <label for="buyerGST">GSTIN NO</label>
+                                                <div id="buyerGST" class="rich-editable single-line"
+                                                    contenteditable="true" data-sync="bill-to-gst"></div>
+                                            </div>
+                                            <div class="input-group">
+                                                <label for="buyerState">State Name</label>
+                                                <select id="buyerState" class="state-selector"
+                                                    data-target="buyerStateCode">
+                                                    <option value="">Select State</option>
+                                                    <option value="01">Jammu & Kashmir</option>
+                                                    <option value="02">Himachal Pradesh</option>
+                                                    <option value="03">Punjab</option>
+                                                    <option value="04">Chandigarh</option>
+                                                    <option value="05">Uttarakhand</option>
+                                                    <option value="06">Haryana</option>
+                                                    <option value="07">Delhi</option>
+                                                    <option value="08">Rajasthan</option>
+                                                    <option value="09">Uttar Pradesh</option>
+                                                    <option value="10">Bihar</option>
+                                                    <option value="11">Sikkim</option>
+                                                    <option value="12">Arunachal Pradesh</option>
+                                                    <option value="13">Nagaland</option>
+                                                    <option value="14">Manipur</option>
+                                                    <option value="15">Mizoram</option>
+                                                    <option value="16">Tripura</option>
+                                                    <option value="17">Meghalaya</option>
+                                                    <option value="18">Assam</option>
+                                                    <option value="19">West Bengal</option>
+                                                    <option value="20">Jharkhand</option>
+                                                    <option value="21">Odisha</option>
+                                                    <option value="22">Chhattisgarh</option>
+                                                    <option value="23">Madhya Pradesh</option>
+                                                    <option value="24">Gujarat</option>
+                                                    <option value="25">Daman & Diu</option>
+                                                    <option value="26">Dadra & Nagar Haveli</option>
+                                                    <option value="27">Maharashtra</option>
+                                                    <option value="29">Karnataka</option>
+                                                    <option value="30">Goa</option>
+                                                    <option value="31">Lakshadweep</option>
+                                                    <option value="32">Kerala</option>
+                                                    <option value="33">Tamil Nadu</option>
+                                                    <option value="34">Puducherry</option>
+                                                    <option value="35">Andaman & Nicobar Islands</option>
+                                                    <option value="36">Telangana</option>
+                                                    <option value="37">Andhra Pradesh</option>
+                                                    <option value="38">Ladakh</option>
+                                                    <option value="97">Other Territory</option>
+                                                </select>
+                                            </div>
+                                            <div class="input-group">
+                                                <label for="buyerStateCode">State Code</label>
+                                                <div id="buyerStateCode" class="rich-editable single-line"
+                                                    contenteditable="true" data-sync="bill-to-state"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div id="shipToFields" class="hidden">
+                                        <hr class="divider" style="margin: 0.75rem 0;">
+                                        <div class="grid-2">
+                                            <div class="left-col">
+                                                <div class="input-group">
+                                                    <label for="shipToName">Ship To Name</label>
+                                                    <div id="shipToName" class="rich-editable single-line"
+                                                        contenteditable="true" data-sync="ship-to-name"></div>
+                                                </div>
+                                                <div class="input-group">
+                                                    <label for="shipToAddress">Ship To Address</label>
+                                                    <div id="shipToAddress" class="rich-editable multiline"
+                                                        contenteditable="true" data-sync="ship-to-address"></div>
+                                                </div>
+                                            </div>
+                                            <div class="right-col">
+                                                <div class="input-group">
+                                                    <label for="shipToGST">GSTIN NO</label>
+                                                    <div id="shipToGST" class="rich-editable single-line"
+                                                        contenteditable="true" data-sync="ship-to-gst"></div>
+                                                </div>
+                                                <div class="input-group">
+                                                    <label for="shipToState">State Name</label>
+                                                    <select id="shipToState" class="state-selector"
+                                                        data-target="shipToStateCode">
+                                                        <option value="">Select State</option>
+                                                        <option value="01">Jammu & Kashmir</option>
+                                                        <option value="02">Himachal Pradesh</option>
+                                                        <option value="03">Punjab</option>
+                                                        <option value="04">Chandigarh</option>
+                                                        <option value="05">Uttarakhand</option>
+                                                        <option value="06">Haryana</option>
+                                                        <option value="07">Delhi</option>
+                                                        <option value="08">Rajasthan</option>
+                                                        <option value="09">Uttar Pradesh</option>
+                                                        <option value="10">Bihar</option>
+                                                        <option value="11">Sikkim</option>
+                                                        <option value="12">Arunachal Pradesh</option>
+                                                        <option value="13">Nagaland</option>
+                                                        <option value="14">Manipur</option>
+                                                        <option value="15">Mizoram</option>
+                                                        <option value="16">Tripura</option>
+                                                        <option value="17">Meghalaya</option>
+                                                        <option value="18">Assam</option>
+                                                        <option value="19">West Bengal</option>
+                                                        <option value="20">Jharkhand</option>
+                                                        <option value="21">Odisha</option>
+                                                        <option value="22">Chhattisgarh</option>
+                                                        <option value="23">Madhya Pradesh</option>
+                                                        <option value="24">Gujarat</option>
+                                                        <option value="25">Daman & Diu</option>
+                                                        <option value="26">Dadra & Nagar Haveli</option>
+                                                        <option value="27">Maharashtra</option>
+                                                        <option value="29">Karnataka</option>
+                                                        <option value="30">Goa</option>
+                                                        <option value="31">Lakshadweep</option>
+                                                        <option value="32">Kerala</option>
+                                                        <option value="33">Tamil Nadu</option>
+                                                        <option value="34">Puducherry</option>
+                                                        <option value="35">Andaman & Nicobar Islands</option>
+                                                        <option value="36">Telangana</option>
+                                                        <option value="37">Andhra Pradesh</option>
+                                                        <option value="38">Ladakh</option>
+                                                        <option value="97">Other Territory</option>
+                                                    </select>
+                                                </div>
+                                                <div class="input-group">
+                                                    <label for="shipToStateCode">State Code</label>
+                                                    <div id="shipToStateCode" class="rich-editable single-line"
+                                                        contenteditable="true" data-sync="ship-to-state"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <!-- Items Section -->
+                                <section class="card table-card">
+                                    <h2 class="section-title">Descriptions of Goods</h2>
+                                    <div class="table-wrapper">
+                                        <table id="productTable">
+                                            <thead>
+                                                <tr>
+                                                    <th width="30px">S.N</th>
+                                                    <th>Description</th>
+                                                    <th width="80px">HSN/SAC</th>
+                                                    <th width="60px">Qty</th>
+                                                    <th width="60px">Rate</th>
+                                                    <th width="30px"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="productBody">
+                                                <!-- Dynamic rows here -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <button type="button" id="addRow" class="btn btn-secondary btn-sm"
+                                        style="margin-top: 0.5rem;">+
+                                        Add Item</button>
+                                </section>
+
+                                <!-- Multi-Section Row for Bank & Tax -->
+                                <div class="grid-2">
+                                    <!-- Bank Details -->
+                                    <section class="card" style="margin-bottom: 0;">
+                                        <h2 class="section-title">Bank Details</h2>
+                                        <div class="grid-2">
+                                            <div class="input-group">
+                                                <label for="bankHolder">A/C HOLDER’S NAME</label>
+                                                <div id="bankHolder" class="rich-editable single-line"
+                                                    contenteditable="true" data-sync="bank-holder">AVNEESH CORPORATION
+                                                </div>
+                                            </div>
+                                            <div class="input-group">
+                                                <label for="bankName">BANK NAME</label>
+                                                <div id="bankName" class="rich-editable single-line"
+                                                    contenteditable="true" data-sync="bank-name">BANK OF BARODA</div>
+                                            </div>
+                                        </div>
+                                        <div class="grid-2">
+                                            <div class="input-group">
+                                                <label for="bankAccount">A/C NO.</label>
+                                                <div id="bankAccount" class="rich-editable single-line"
+                                                    contenteditable="true" data-sync="bank-acc">05000500000161</div>
+                                            </div>
+                                            <div class="input-group">
+                                                <label for="bankIFSC">IFSC CODE</label>
+                                                <div id="bankIFSC" class="rich-editable single-line"
+                                                    contenteditable="true" data-sync="bank-ifsc">BARB0INDIND</div>
+                                            </div>
+                                        </div>
+                                        <div id="bankAddressGroup" class="input-group hidden">
+                                            <label for="bankAddress">BANK ADDRESS</label>
+                                            <div id="bankAddress" class="rich-editable single-line"
+                                                contenteditable="true" data-sync="bank-address"></div>
+                                        </div>
+                                    </section>
+
+                                    <!-- Tax Configuration -->
+                                    <section class="card" style="margin-bottom: 0;">
+                                        <h2 class="section-title">Taxes (%)</h2>
+                                        <div class="input-group">
+                                            <label for="cgst">CGST %</label>
+                                            <input type="number" id="cgst" value="0" step="0.1">
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="sgst">SGST %</label>
+                                            <input type="number" id="sgst" value="0" step="0.1">
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="igst">IGST %</label>
+                                            <input type="number" id="igst" value="18" step="0.1">
+                                        </div>
+                                    </section>
+                                </div>
+                            </form>
+
+                            <!-- Old Invoices Search Section -->
+                            <section class="card" style="margin-top: 1rem;">
+                                <h2 class="section-title">Download Old Invoice</h2>
+                                <div class="grid-3" style="gap: 0.5rem; margin-bottom: 0.5rem;">
+                                    <div class="input-group">
+                                        <label style="font-size: 0.65rem;">DAY</label>
+                                        <select id="searchDay" style="font-size: 0.8rem; padding: 4px;">
+                                            <option value="">All</option>
+                                            <option value="01">1</option>
+                                            <option value="02">2</option>
+                                            <option value="03">3</option>
+                                            <option value="04">4</option>
+                                            <option value="05">5</option>
+                                            <option value="06">6</option>
+                                            <option value="07">7</option>
+                                            <option value="08">8</option>
+                                            <option value="09">9</option>
+                                            <option value="10">10</option>
+                                            <option value="11">11</option>
+                                            <option value="12">12</option>
+                                            <option value="13">13</option>
+                                            <option value="14">14</option>
+                                            <option value="15">15</option>
+                                            <option value="16">16</option>
+                                            <option value="17">17</option>
+                                            <option value="18">18</option>
+                                            <option value="19">19</option>
+                                            <option value="20">20</option>
+                                            <option value="21">21</option>
+                                            <option value="22">22</option>
+                                            <option value="23">23</option>
+                                            <option value="24">24</option>
+                                            <option value="25">25</option>
+                                            <option value="26">26</option>
+                                            <option value="27">27</option>
+                                            <option value="28">28</option>
+                                            <option value="29">29</option>
+                                            <option value="30">30</option>
+                                            <option value="31">31</option>
+                                        </select>
+                                    </div>
+                                    <div class="input-group">
+                                        <label style="font-size: 0.65rem;">MONTH</label>
+                                        <select id="searchMonth" style="font-size: 0.8rem; padding: 4px;">
+                                            <option value="">All</option>
+                                            <option value="01">Jan</option>
+                                            <option value="02">Feb</option>
+                                            <option value="03">Mar</option>
+                                            <option value="04">Apr</option>
+                                            <option value="05">May</option>
+                                            <option value="06">Jun</option>
+                                            <option value="07">Jul</option>
+                                            <option value="08">Aug</option>
+                                            <option value="09">Sep</option>
+                                            <option value="10">Oct</option>
+                                            <option value="11">Nov</option>
+                                            <option value="12">Dec</option>
+                                        </select>
+                                    </div>
+                                    <div class="input-group">
+                                        <label style="font-size: 0.65rem;">YEAR</label>
+                                        <select id="searchYear" style="font-size: 0.8rem; padding: 4px;">
+                                            <option value="">All</option>
+                                            <option value="2024">2024</option>
+                                            <option value="2025">2025</option>
+                                            <option value="2026">2026</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button id="searchOldBtn" class="btn btn-secondary"
+                                    style="width: 100%; font-size: 0.8rem; padding: 0.5rem;">
+                                    🔍 Find Invoices
+                                </button>
+                            </section>
+                        </aside>
+
+                        <!-- Right Pane: Professional Preview -->
+                        <div class="preview-pane">
+                            <div class="preview-controls">
+                                <div class="copy-type">
+                                    <label>Copy Type:</label>
+                                    <select id="copySelector">
+                                        <option value="ORIGINAL FOR RECIPIENT">Original</option>
+                                        <option value="DUPLICATE FOR TRANSPORTER">Duplicate</option>
+                                        <option value="SUPPLIER COPY">Supplier Copy</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div id="invoicePreview" class="invoice-container">
+                                <div class="invoice-content">
+                                    <table class="main-invoice-table"
+                                        style="border: 0.2mm solid #1e40af; border-collapse: collapse; width: 100%; table-layout: fixed;">
+                                        <!-- Header: INVOICE -->
+                                        <tr>
+                                            <td colspan="2"
+                                                style="border-bottom: 0.2mm solid #1e40af; padding: 10px; position: relative; text-align: center;">
+                                                <h2
+                                                    style="margin: 0; color: #1e40af; font-size: 22px; font-weight: 800; letter-spacing: 1px;">
+                                                    INVOICE</h2>
+                                                <span id="copyText"
+                                                    style="position: absolute; right: 15px; top: 18px; font-size: 9px; color: #333; font-weight: 700;">(ORIGINAL
+                                                    FOR RECIPIENT)</span>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Section 1: Seller & Invoice/Transport -->
+                                        <tr>
+                                            <td width="55%"
+                                                style="border-right: 0.2mm solid #1e40af; border-bottom: none !important; padding: 12px; vertical-align: top;">
+                                                <div
+                                                    style="color: #1e40af; font-size: 10px; font-weight: 800; margin-bottom: 5px;">
+                                                    SELLER</div>
+                                                <div id="preview-seller-name"
+                                                    style="font-size: 16px; font-weight: 900; color: #000; margin-bottom: 8px;">
+                                                    AVNEESH CORPORATION</div>
+                                                <div style="font-size: 11px; line-height: 1.4; color: #000;">
+                                                    <span style="font-weight: 800;">Address :</span> <span
+                                                        id="preview-seller-address" style="font-weight: 400;">Plot No.44
+                                                        Survey
+                                                        No.25/3/2, Sanwer Main Road Sanwer Main Choraha , Sanwer ,
+                                                        Indore (453551)</span><br>
+                                                    <span style="font-weight: 800;">GSTIN NO :</span> <span
+                                                        id="preview-seller-gst"
+                                                        style="font-weight: 400;">23CAEPR5751F1ZQ</span><br>
+                                                    <span style="font-weight: 800;">State Name :</span> <span
+                                                        id="preview-seller-state-name" style="font-weight: 400;">MADHYA
+                                                        PRADESH</span><br>
+                                                    <span style="font-weight: 800;">State Code :</span> <span
+                                                        id="preview-seller-state"
+                                                        style="font-weight: 400;">23</span><br>
+                                                    <span style="font-weight: 800;">Dispatch From :</span> <span
+                                                        id="preview-dispatch-from"
+                                                        style="font-weight: 400;">Indore</span>
+                                                </div>
+                                            </td>
+                                            <td width="45%"
+                                                style="border-bottom: none !important; padding: 0; vertical-align: top;">
+                                                <table class="nested-info-table"
+                                                    style="width: 100%; border-collapse: collapse; height: 100%;">
+                                                    <tr>
+                                                        <td
+                                                            style="border-bottom: 0.2mm solid #1e40af !important; padding: 12px;">
+                                                            <div
+                                                                style="color: #1e40af; font-size: 10px; font-weight: 800; margin-bottom: 5px;">
+                                                                INVOICE DETAILS</div>
+                                                            <div
+                                                                style="font-size: 12px; line-height: 1.6; color: #000;">
+                                                                <span style="font-weight: 800;">Invoice No :</span>
+                                                                <span id="preview-invoice-no"
+                                                                    style="font-weight: 400; color: #000;">AC/26-27/04</span><br>
+                                                                <span style="font-weight: 800;">Date :</span> <span
+                                                                    id="preview-invoice-date"
+                                                                    style="font-weight: 400; color: #000;">24/04/2026</span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td style="padding: 12px;">
+                                                            <div
+                                                                style="color: #1e40af; font-size: 11px; font-weight: 800; margin-bottom: 5px;">
+                                                                TRANSPORT DETAILS</div>
+                                                            <div
+                                                                style="font-size: 11.5px; line-height: 1.4; color: #000;">
+                                                                <span style="font-weight: 800;">Transport :</span> <span
+                                                                    id="preview-transport-name"
+                                                                    style="color: #000; font-weight: 400;"></span><br>
+                                                                <span style="font-weight: 800;">Lorry No :</span> <span
+                                                                    id="preview-lorry-no"
+                                                                    style="color: #000; font-weight: 400;"></span><br>
+                                                                <span style="font-weight: 800;">Bilty No :</span> <span
+                                                                    id="preview-bilty-no"
+                                                                    style="color: #000; font-weight: 400;"></span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Section 2: Bill To & Ship To -->
+                                        <tr style="border-top: 0.2mm solid #1e40af;">
+                                            <td
+                                                style="border-right: 0.2mm solid #1e40af; padding: 12px; vertical-align: top;">
+                                                <div
+                                                    style="color: #1e40af; font-size: 11px; font-weight: 800; margin-bottom: 5px;">
+                                                    BILL TO (RECIPIENT)</div>
+                                                <div style="font-size: 11.5px; line-height: 1.4; color: #000;">
+                                                    <span id="preview-bill-to-name"
+                                                        style="font-weight: 800; color: #000; font-size: 13.5px;"></span><br>
+                                                    <span style="font-weight: 800;">Address :</span> <span
+                                                        id="preview-bill-to-address"
+                                                        style="color: #000; font-weight: 400;"></span><br><br>
+                                                    <span style="font-weight: 800;">GSTIN:</span> <span
+                                                        id="preview-bill-to-gst"
+                                                        style="font-weight: 400; color: #000;"></span><br>
+                                                    <span style="font-weight: 800;">State Name :</span> <span
+                                                        id="preview-bill-to-state-name"
+                                                        style="color: #000; font-weight: 400;"></span><br>
+                                                    <span style="font-weight: 800;">State Code :</span> <span
+                                                        id="preview-bill-to-state"
+                                                        style="color: #000; font-weight: 400;"></span>
+                                                </div>
+                                            </td>
+                                            <td style="padding: 12px; vertical-align: top;">
+                                                <div
+                                                    style="color: #1e40af; font-size: 11px; font-weight: 800; margin-bottom: 5px;">
+                                                    SHIP TO (CONSIGNEE)</div>
+                                                <div style="font-size: 11.5px; line-height: 1.4; color: #000;">
+                                                    <span id="preview-ship-to-name"
+                                                        style="font-weight: 800; color: #000; font-size: 13.5px;"></span><br>
+                                                    <span style="font-weight: 800;">Address :</span> <span
+                                                        id="preview-ship-to-address"
+                                                        style="color: #000; font-weight: 400;"></span><br><br>
+                                                    <span style="font-weight: 800;">GSTIN:</span> <span
+                                                        id="preview-ship-to-gst"
+                                                        style="font-weight: 400; color: #000;"></span><br>
+                                                    <span style="font-weight: 800;">State Name :</span> <span
+                                                        id="preview-ship-to-state-name"
+                                                        style="color: #000; font-weight: 400;"></span><br>
+                                                    <span style="font-weight: 800;">State Code :</span> <span
+                                                        id="preview-ship-to-state"
+                                                        style="color: #000; font-weight: 400;"></span>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Section 3: Product Table -->
+                                        <tr style="border-top: 0.2mm solid #1e40af;">
+                                            <td colspan="2" style="padding: 0;">
+                                                <table class="preview-product-table"
+                                                    style="width: 100%; border-collapse: collapse;">
+                                                    <thead>
+                                                        <tr style="background-color: #1e40af; color: white;">
+                                                            <th
+                                                                style="border: 0.3mm solid #fff; padding: 8px; font-size: 11px;">
+                                                                S.N</th>
+                                                            <th
+                                                                style="border: 0.3mm solid #fff; padding: 8px; font-size: 11px;">
+                                                                Description of Goods</th>
+                                                            <th
+                                                                style="border: 0.3mm solid #fff; padding: 8px; font-size: 11px;">
+                                                                HSN/SAC</th>
+                                                            <th
+                                                                style="border: 0.3mm solid #fff; padding: 8px; font-size: 11px;">
+                                                                Quantity</th>
+                                                            <th
+                                                                style="border: 0.3mm solid #fff; padding: 8px; font-size: 11px;">
+                                                                Rate</th>
+                                                            <th
+                                                                style="border: 0.3mm solid #fff; padding: 8px; font-size: 11px;">
+                                                                Amount</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="preview-product-body" style="font-size: 12px;">
+                                                        <!-- Dynamic Rows -->
+                                                    </tbody>
+                                                </table>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Section 4: Empty Space & Summary -->
+                                        <tr style="border-top: 0.2mm solid #1e40af;">
+                                            <td colspan="2" style="padding: 0;">
+                                                <table style="width: 100%; border-collapse: collapse;">
+                                                    <tr>
+                                                        <td style="border: none; padding: 0;"></td>
+                                                        <td width="35%"
+                                                            style="border-left: 0.2mm solid #1e40af; padding: 0;">
+                                                            <table
+                                                                style="width: 100%; border-collapse: collapse; font-size: 12px; color: #000;">
+                                                                <tr>
+                                                                    <td
+                                                                        style="border-bottom: 0.2mm solid #1e40af; border-right: 0.2mm solid #1e40af; padding: 6px 10px; font-weight: 800;">
+                                                                        SUB TOTAL</td>
+                                                                    <td id="preview-subtotal"
+                                                                        style="border-bottom: 0.2mm solid #1e40af; padding: 6px 10px; text-align: right; font-weight: 400;">
+                                                                        0.00</td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td
+                                                                        style="border-bottom: 0.2mm solid #1e40af; border-right: 0.2mm solid #1e40af; padding: 6px 10px; font-weight: 800;">
+                                                                        CGST <span id="preview-cgst-rate">0</span>%</td>
+                                                                    <td id="preview-cgst-val"
+                                                                        style="border-bottom: 0.2mm solid #1e40af; padding: 6px 10px; text-align: right; font-weight: 400;">
+                                                                        -</td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td
+                                                                        style="border-bottom: 0.2mm solid #1e40af; border-right: 0.2mm solid #1e40af; padding: 6px 10px; font-weight: 800;">
+                                                                        SGST <span id="preview-sgst-rate">0</span>%</td>
+                                                                    <td id="preview-sgst-val"
+                                                                        style="border-bottom: 0.2mm solid #1e40af; padding: 6px 10px; text-align: right; font-weight: 400;">
+                                                                        -</td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td
+                                                                        style="border-bottom: 0.2mm solid #1e40af; border-right: 0.2mm solid #1e40af; padding: 6px 10px; font-weight: 800;">
+                                                                        IGST <span id="preview-igst-rate">18</span>%
+                                                                    </td>
+                                                                    <td id="preview-igst-val"
+                                                                        style="border-bottom: 0.2mm solid #1e40af; padding: 6px 10px; text-align: right; font-weight: 400;">
+                                                                        0.00</td>
+                                                                </tr>
+                                                                <tr style="background-color: #1e40af; color: white;">
+                                                                    <td
+                                                                        style="border-right: 0.2mm solid #fff; padding: 8px 10px; font-weight: 900; font-size: 14px;">
+                                                                        TOTAL AMOUNT</td>
+                                                                    <td id="preview-total-amount"
+                                                                        style="padding: 8px 10px; text-align: right; font-weight: 900; font-size: 14px;">
+                                                                        0.00</td>
+                                                                </tr>
+                                                            </table>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Section 5: Amount in Words -->
+                                        <tr style="border-top: 0.2mm solid #1e40af;">
+                                            <td colspan="2" style="padding: 10px; font-size: 11px;">
+                                                <b>Amount Chargeable (in words): </b>
+                                                <span id="preview-amount-words" style="text-transform: uppercase;">ZERO
+                                                    ONLY</span>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Section 6: Bank & Signature -->
+                                        <tr style="border-top: 0.2mm solid #1e40af;">
+                                            <td width="55%"
+                                                style="border-right: 0.4mm solid #1e40af; padding: 12px; vertical-align: top;">
+                                                <div
+                                                    style="color: #1e40af; font-size: 11px; font-weight: 800; margin-bottom: 5px;">
+                                                    BANK DETAILS</div>
+                                                <div style="font-size: 11.5px; line-height: 1.4; color: #000;">
+                                                    <span style="font-weight: 800;">Account Holder Name :</span> <span
+                                                        id="preview-bank-holder"
+                                                        style="color: #000; font-weight: 400;">AVNEESH
+                                                        CORPORATION</span><br>
+                                                    <span style="font-weight: 800;">Bank Name :</span> <span
+                                                        id="preview-bank-name"
+                                                        style="color: #000; font-weight: 400;">BANK OF BARODA</span><br>
+                                                    <span style="font-weight: 800;">Account Number :</span> <span
+                                                        id="preview-bank-account"
+                                                        style="color: #000; font-weight: 400;">05000500000161</span><br>
+                                                    <span style="font-weight: 800;">IFSC Code :</span> <span
+                                                        id="preview-bank-ifsc"
+                                                        style="color: #000; font-weight: 400;">BARB0INDIND</span>
+                                                </div>
+                                            </td>
+                                            <td style="padding: 12px; vertical-align: top; text-align: center;">
+                                                <div
+                                                    style="color: #1e40af; font-size: 13px; font-weight: 800; margin-bottom: 40px;">
+                                                    <span id="preview-authorized-company">FOR AVNEESH CORPORATION</span></div>
+                                                <div style="font-size: 11px; font-weight: 700;">Authorized Signatory
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    <div id="jurisdictionText" style="text-align: center; font-size: 9px; color: #666; padding: 5px;">
+                                        NOTE : ALL SUBJECT TO INDORE JURISDICTION
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div> <!-- workspace -->
+                    <template id="sksInvoiceTemplate">
+                        <div class="invoice-content sks-invoice-content">
+                            <table class="main-invoice-table sks-main-table">
+                                <tbody>
+                                    <tr class="sks-heading-row">
+                                        <td class="sks-seller-heading">
+                                            <div id="preview-seller-name" class="sks-company-name">SHREE KEDARNATH STEEL</div>
+                                            <div id="preview-seller-address" class="sks-company-address">132 Ganesh Dham Colony Sanwer Road, Indore (452015)</div>
+                                            <div class="sks-company-meta">GSTIN NO&nbsp; : <span id="preview-seller-gst">23DJAPR4723R1ZR</span></div>
+                                            <div class="sks-company-meta">State Code : <span id="preview-seller-state">23</span>&nbsp; | &nbsp;<span id="preview-seller-state-name">MADHYA PRADESH</span></div>
+                                            <div class="sks-company-meta sks-dispatch-line">Dispatch From : <span id="preview-dispatch-from"></span></div>
+                                        </td>
+                                        <td class="sks-invoice-heading">
+                                            <h2 class="sks-title">INVOICE</h2>
+                                            <div id="copyText" class="sks-copy-label">(ORIGINAL FOR RECIPIENT)</div>
+                                            <table class="sks-invoice-meta">
+                                                <tbody>
+                                                    <tr><th>Invoice No.</th><td id="preview-invoice-no">SKS/26-27/36</td></tr>
+                                                    <tr><th>Invoice Date</th><td id="preview-invoice-date"></td></tr>
+                                                </tbody>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <table class="sks-party-table">
+                                <tbody>
+                                    <tr>
+                                        <td>
+                                            <div class="sks-panel-title">Bill To</div>
+                                            <div id="preview-bill-to-name" class="sks-party-name"></div>
+                                            <div id="preview-bill-to-address" class="sks-party-address"></div>
+                                            <div class="sks-party-meta">GSTIN NO&nbsp; : <span id="preview-bill-to-gst"></span></div>
+                                            <div class="sks-party-meta">State Code : <span id="preview-bill-to-state"></span>&nbsp; | &nbsp;<span id="preview-bill-to-state-name"></span></div>
+                                        </td>
+                                        <td>
+                                            <div class="sks-panel-title">Ship To</div>
+                                            <div id="preview-ship-to-name" class="sks-party-name"></div>
+                                            <div id="preview-ship-to-address" class="sks-party-address"></div>
+                                            <div class="sks-party-meta">GSTIN NO&nbsp; : <span id="preview-ship-to-gst"></span></div>
+                                            <div class="sks-party-meta">State Code : <span id="preview-ship-to-state"></span>&nbsp; | &nbsp;<span id="preview-ship-to-state-name"></span></div>
+                                        </td>
+                                        <td>
+                                            <div class="sks-panel-title">Transport Details</div>
+                                            <div class="sks-transport-row"><span>Name</span><b>:</b><span id="preview-transport-name"></span></div>
+                                            <div class="sks-transport-row"><span>Bilty No</span><b>:</b><span id="preview-bilty-no"></span></div>
+                                            <div class="sks-transport-row"><span>Lorry No</span><b>:</b><span id="preview-lorry-no"></span></div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <table class="preview-product-table sks-items-table">
+                                <thead><tr><th>S.No</th><th>Description of Goods</th><th>HSN/SAC</th><th>QTY</th><th>RATE</th><th>AMOUNT</th></tr></thead>
+                                <tbody id="preview-product-body"></tbody>
+                            </table>
+
+                            <table class="sks-summary-table">
+                                <tbody>
+                                    <tr><td rowspan="6" class="sks-summary-empty"></td><th>TOTAL</th><td id="preview-subtotal">0.00</td></tr>
+                                    <tr><th>CGST <span id="preview-cgst-rate">9</span> %</th><td id="preview-cgst-val">-</td></tr>
+                                    <tr><th>SGST <span id="preview-sgst-rate">9</span> %</th><td id="preview-sgst-val">-</td></tr>
+                                    <tr><th>IGST <span id="preview-igst-rate">18</span> %</th><td id="preview-igst-val">-</td></tr>
+                                    <tr class="sks-gross-row"><th>GROSS TOTAL</th><td id="preview-total-amount">0.00</td></tr>
+                                    <tr class="sks-summary-spacer"><td colspan="2"></td></tr>
+                                </tbody>
+                            </table>
+
+                            <div class="sks-amount-words"><strong>Amount in Words :</strong> <span id="preview-amount-words">ZERO ONLY</span></div>
+
+                            <table class="sks-footer-table">
+                                <tbody>
+                                    <tr>
+                                        <td class="sks-bank-panel">
+                                            <div class="sks-footer-title">BANK DETAILS</div>
+                                            <div class="sks-bank-line"><span>BANK NAME</span><b>:</b><span id="preview-bank-name">HDFC BANK</span></div>
+                                            <div class="sks-bank-line"><span>ACCOUNT NO</span><b>:</b><span id="preview-bank-account">50200086052840</span></div>
+                                            <div class="sks-bank-line"><span>IFSC CODE</span><b>:</b><span id="preview-bank-ifsc">HDFC0009403</span></div>
+                                            <div class="sks-bank-line"><span>ACCOUNT HOLDER</span><b>:</b><span id="preview-bank-holder">SHREE KEDARNATH STEEL</span></div>
+                                            <div class="sks-bank-line"><span>ADDRESS</span><b>:</b><span id="preview-bank-address">INDORE SANWER ROAD BRANCH</span></div>
+                                        </td>
+                                        <td class="sks-signatory-panel">
+                                            <div id="preview-authorized-company" class="sks-authorized-company">FOR SHREE KEDARNATH STEEL</div>
+                                            <div class="sks-signature-space"></div>
+                                            <div class="sks-signature-line"></div>
+                                            <div>Authorized Signatory</div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <div id="jurisdictionText" class="sks-note"><strong>NOTE :</strong><br>ALL SUBJECT TO INDORE JURISDICTION</div>
+                        </div>
+                    </template>
+                </div> <!-- createInvoiceView -->
+
+                <!-- PDF Downloads View -->
+                <div id="pdfDownloadsView" class="view-section hidden">
+                    <div class="dashboard-header">
+                        <h1 class="dashboard-title">📥 PDF Download Requests</h1>
+                        <p class="section-subtitle">All on-demand E-Invoice PDF download requests raised by you. Click <strong>Download</strong> on any row to generate and save the PDF.</p>
+                    </div>
+
+                    <div class="records-card card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                            <h2 class="section-title" style="margin-bottom: 0; border-bottom: none;">My Download Requests</h2>
+                            <button id="clearPDFRequestsBtn" class="btn btn-secondary btn-sm" style="display: flex; align-items: center; gap: 6px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6l-1 14H6L5 6"></path>
+                                    <path d="M10 11v6"></path>
+                                    <path d="M14 11v6"></path>
+                                    <path d="M9 6V4h6v2"></path>
+                                </svg>
+                                Clear All
+                            </button>
+                        </div>
+                        <div id="pdfRequestsList" class="pdf-request-list">
+                            <!-- Populated by JS -->
+                            <div class="empty-state">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                                    stroke-linecap="round" stroke-linejoin="round" width="48" height="48"
+                                    style="color: var(--text-muted); margin-bottom: 1rem;">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                <p>No PDF download requests yet.</p>
+                                <p style="font-size: 0.85rem;">Go to <strong>Create Invoice</strong>, fill in your details, and click <strong>Request PDF Download</strong> in the preview pane.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div> <!-- pdfDownloadsView -->
+
+                <!-- Ledger View -->
+                <div id="ledgerView" class="view-section hidden">
+                    <div class="dashboard-header">
+                        <h1 class="dashboard-title">📘 Ledger Management</h1>
+                        <p class="section-subtitle">Manage account ledgers, import bulk records from Excel templates, and generate custom Excel/PDF downloads.</p>
+                    </div>
+
+                    <!-- Action Bar -->
+                    <div class="action-bar-grid card" style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 1.25rem; margin-bottom: 1.5rem;">
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                            <button id="btnOpenCreateLedger" class="btn btn-primary" style="display: flex; align-items: center; gap: 8px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                Create Ledger
+                            </button>
+                            <button id="btnOpenImportLedger" class="btn btn-secondary" style="display: flex; align-items: center; gap: 8px; border-color: var(--accent); color: var(--accent);">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                Import Ledger (Excel)
+                            </button>
+                            <button id="btnDownloadSampleTemplate" class="btn btn-secondary" style="display: flex; align-items: center; gap: 8px;" title="Download standard Excel Ledger format template">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                Excel Template
+                            </button>
+                        </div>
+                        <div>
+                            <button id="btnOpenDownloadHistory" class="btn btn-secondary btn-sm" style="display: flex; align-items: center; gap: 6px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                Download Requests History
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Ledgers Table Card -->
+                    <div class="records-card card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+                            <h2 class="section-title" style="margin-bottom: 0; border-bottom: none;">Saved Ledgers</h2>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="text" id="ledgerSearchInput" class="form-control" placeholder="🔍 Search by Account or Number..." style="max-width: 250px; font-size: 0.85rem; padding: 6px 12px;">
+                            </div>
+                        </div>
+
+                        <div class="table-wrapper">
+                            <table id="ledgerTable">
+                                <thead>
+                                    <tr>
+                                        <th>Account Name</th>
+                                        <th>Account No</th>
+                                        <th>Month of</th>
+                                        <th>Sheet No</th>
+                                        <th>Total Debit (₹)</th>
+                                        <th>Total Credit (₹)</th>
+                                        <th>Created Date</th>
+                                        <th style="text-align: right;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ledgerTableBody">
+                                    <tr>
+                                        <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                                            Loading Ledgers...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div> <!-- ledgerView -->
+
+                <!-- Profile View -->
+                <div id="profileView" class="view-section hidden">
+                    <div class="dashboard-header">
+                        <h1 class="dashboard-title">User Profile & Settings</h1>
+                        <p class="section-subtitle">Manage your personal identity, business details, and application
+                            preferences.</p>
+                    </div>
+
+                    <div class="profile-grid">
+                        <!-- 1. Basic Information (Identity) -->
+                        <section class="card profile-card">
+                            <div class="profile-card-header">
+                                <div class="icon-circle">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        stroke-linecap="round" stroke-linejoin="round" width="24" height="24">
+                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="12" cy="7" r="4"></circle>
+                                    </svg>
+                                </div>
+                                <h2 class="section-title">Basic Information</h2>
+                            </div>
+
+                            <div class="profile-upload-container">
+                                <div class="profile-pic-preview" id="profilePicPreview">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                                        stroke-linecap="round" stroke-linejoin="round" width="40" height="40">
+                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="12" cy="7" r="4"></circle>
+                                    </svg>
+                                </div>
+                                <div class="upload-btn-wrapper">
+                                    <button type="button" class="btn btn-secondary btn-sm">Upload Photo</button>
+                                    <input type="file" id="profilePicInput" accept="image/*" />
+                                </div>
+                            </div>
+
+                            <div class="grid-2" style="margin-top: 1.5rem;">
+                                <div class="input-group">
+                                    <label>Full Name</label>
+                                    <input type="text" id="profName" placeholder="e.g. Avneesh Mishra">
+                                </div>
+                                <div class="input-group">
+                                    <label>Email Address (Login ID)</label>
+                                    <input type="email" id="profEmail" placeholder="e.g. avneesh.co@example.com">
+                                </div>
+                                <div class="input-group">
+                                    <label>Phone Number</label>
+                                    <input type="tel" id="profPhone" placeholder="+91 00000 00000">
+                                </div>
+                                <div class="input-group">
+                                    <label>User Role</label>
+                                    <select id="profRole">
+                                        <option value="Admin">Admin</option>
+                                        <option value="Accountant">Accountant</option>
+                                        <option value="Viewer">Viewer</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- 2. Company Details -->
+                        <section class="card profile-card">
+                            <div class="profile-card-header">
+                                <div class="icon-circle">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        stroke-linecap="round" stroke-linejoin="round" width="24" height="24">
+                                        <path d="M3 21h18"></path>
+                                        <path
+                                            d="M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7H3l2-4h14l2 4">
+                                        </path>
+                                        <path d="M5 21V10.85"></path>
+                                        <path d="M19 21V10.85"></path>
+                                        <path d="M9 21v-4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4"></path>
+                                    </svg>
+                                </div>
+                                <h2 class="section-title">Company Details</h2>
+                            </div>
+
+                            <div class="grid-2">
+                                <div class="input-group" style="grid-column: span 2;">
+                                    <label>Company Name</label>
+                                    <input type="text" id="profCompName" placeholder="Business Name">
+                                </div>
+                                <div class="input-group">
+                                    <label>GST Number</label>
+                                    <input type="text" id="profGST" placeholder="23XXXXX0000X1Z">
+                                </div>
+                                <div class="input-group">
+                                    <label>Business Address</label>
+                                    <input type="text" id="profAddress" placeholder="Full Address">
+                                </div>
+                            </div>
+
+                            <div class="divider" style="height: 1px; background: var(--border); margin: 1.5rem 0;">
+                            </div>
+
+                            <h3 style="font-size: 0.95rem; margin-bottom: 1rem; color: var(--text);">Bank Information
+                            </h3>
+                            <div class="grid-2">
+                                <div class="input-group">
+                                    <label>Bank Name</label>
+                                    <input type="text" id="profBankName" placeholder="e.g. HDFC Bank">
+                                </div>
+                                <div class="input-group">
+                                    <label>Account Number</label>
+                                    <input type="text" id="profBankAcc" placeholder="0000 0000 0000">
+                                </div>
+                                <div class="input-group">
+                                    <label>IFSC Code</label>
+                                    <input type="text" id="profIFSC" placeholder="HDFC0000XXX">
+                                </div>
+                            </div>
+
+                            <div class="divider" style="height: 1px; background: var(--border); margin: 1.5rem 0;">
+                            </div>
+
+                            <div class="grid-2">
+                                <div class="input-group">
+                                    <label>Company Logo</label>
+                                    <div class="image-upload-box" id="logoUploadBox"
+                                        style="border: 2px dashed var(--border); border-radius: 12px; padding: 1.5rem; text-align: center; cursor: pointer; transition: all 0.3s; position: relative; min-height: 120px; display: flex; align-items: center; justify-content: center;">
+                                        <div class="preview" id="logoPreview"
+                                            style="display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--text-muted);">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+                                                width="30" height="30">
+                                                <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
+                                                <circle cx="9" cy="9" r="2"></circle>
+                                                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+                                            </svg>
+                                            <span style="font-size: 0.8rem;">Upload Logo</span>
+                                        </div>
+                                        <input type="file" id="logoInput" accept="image/*"
+                                            style="position: absolute; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
+                                    </div>
+                                </div>
+                                <div class="input-group">
+                                    <label>Authorized Signature</label>
+                                    <div class="image-upload-box" id="signUploadBox"
+                                        style="border: 2px dashed var(--border); border-radius: 12px; padding: 1.5rem; text-align: center; cursor: pointer; transition: all 0.3s; position: relative; min-height: 120px; display: flex; align-items: center; justify-content: center;">
+                                        <div class="preview" id="signPreview"
+                                            style="display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--text-muted);">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+                                                width="30" height="30">
+                                                <path d="m12 19 7-7 3 3-7 7-3-3z"></path>
+                                                <path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                                                <path d="m2 2 20 20"></path>
+                                                <path d="M11 11 8 8"></path>
+                                            </svg>
+                                            <span style="font-size: 0.8rem;">Upload Sign</span>
+                                        </div>
+                                        <input type="file" id="signInput" accept="image/*"
+                                            style="position: absolute; width: 100%; height: 100%; opacity: 0; cursor: pointer;" />
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+
+                    </div>
+
+                    <div style="text-align: right; margin-top: 2rem; padding-bottom: 2rem;">
+                        <button type="button" id="saveProfileBtn" class="btn btn-primary btn-lg"
+                            style="min-width: 200px; display: inline-flex; align-items: center; justify-content: center; gap: 10px;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                <polyline points="7 3 7 8 15 8"></polyline>
+                            </svg>
+                            Save All Settings
+                        </button>
+                    </div>
+                </div>
+            </main>
+        </div> <!-- main-layout -->
+    </div> <!-- app-container -->
+
+    <!-- History Modal -->
+    <div id="historyModal" class="modal-overlay hidden">
+        <div class="modal-content card">
+            <div class="modal-header">
+                <h2 class="section-title">Invoice History</h2>
+                <button id="closeModal" class="close-btn">&times;</button>
+            </div>
+            <div id="historyResults" class="history-list">
+                <!-- Results will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Overlay -->
+    <div id="loginOverlay" class="login-overlay">
+        <div class="login-card card">
+            <div style="text-align: center; margin-bottom: 2rem;">
+                <h2 style="color: var(--primary); margin-bottom: 0.5rem;">BILLIX LOGIN</h2>
+                <p style="color: var(--text-muted); font-size: 0.9rem;">Enter your credentials to access the invoice
+                    generator</p>
+            </div>
+            <div class="input-group">
+                <label for="loginUserId">User ID</label>
+                <input type="text" id="loginUserId" placeholder="Enter User ID">
+            </div>
+            <div class="input-group">
+                <label for="loginPassword">Password</label>
+                <input type="password" id="loginPassword" placeholder="Enter Password">
+            </div>
+            <p id="loginError" class="error-text hidden">Invalid credentials. Please try again.</p>
+            <button type="button" id="loginBtn" class="btn btn-primary" onclick="handleLogin()"
+                style="width: 100%; padding: 1rem; margin-top: 1rem;">Login to Dashboard</button>
+        </div>
+    </div>
+
+    <style>
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            padding: 2rem;
+            border-radius: 12px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('login-bg.png') no-repeat center center !important;
+            background-size: cover !important;
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            padding: 2.5rem;
+            background: rgba(23, 23, 23, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(108, 180, 44, 0.3);
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+            color: white;
+            text-align: center;
+        }
+
+        .login-card h2,
+        .login-card label,
+        .login-card p {
+            color: white !important;
+        }
+
+        .login-card input {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            border-radius: 8px;
+            padding: 0.8rem;
+        }
+
+        .login-card input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .error-text {
+            color: #ef4444;
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+            text-align: center;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+            transition: background 0.2s;
+            border-radius: 8px;
+            margin-bottom: 5px;
+        }
+
+        .history-item:hover {
+            background: var(--bg-app);
+        }
+
+        .history-info {
+            flex-grow: 1;
+        }
+
+        .history-info p {
+            margin: 2px 0;
+        }
+
+        .history-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-icon {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        #loginBtn {
+            background: #6CB42C !important;
+            border: none !important;
+            color: white !important;
+            font-weight: 600 !important;
+            letter-spacing: 0.5px !important;
+            transition: all 0.3s !important;
+        }
+
+        .pdf-export-container .label-total,
+        .pdf-render-host .label-total {
+            font-size: 13px !important;
+        }
+
+        .pdf-export-container .seller-details,
+        .pdf-render-host .seller-details,
+        .pdf-export-container .details-content,
+        .pdf-render-host .details-content,
+        .pdf-export-container .bank-info,
+        .pdf-render-host .bank-info {
+            font-size: 12.5px !important;
+        }
+
+        #loginBtn:hover {
+            background: #5a9624 !important;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(108, 180, 44, 0.4);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+    <script src="script.js"></script>
+    <!-- Query Modal -->
+    <div id="queryModal" class="modal-overlay hidden">
+        <div class="modal-content card" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Post Your Query</h2>
+                <button class="close-modal" id="closeQueryModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="queryText">Describe your issue or question</label>
+                    <textarea id="queryText" class="form-control" rows="5"
+                        placeholder="Enter your query here..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer" style="margin-top: 1.5rem; text-align: right;">
+                <button class="btn btn-secondary" id="btnCancelQuery">Cancel</button>
+                <button class="btn btn-primary" id="btnSubmitQuery">Post Query</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Ledger Modal -->
+    <div id="createLedgerModal" class="modal-overlay hidden">
+        <div class="modal-content card" style="max-width: 850px; width: 95%;">
+            <div class="modal-header">
+                <h2>Create New Ledger</h2>
+                <button class="close-modal" id="closeCreateLedgerModal">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="createLedgerForm">
+                    <div class="grid-2" style="margin-bottom: 1rem;">
+                        <div class="input-group">
+                            <label for="ledgerAccountName">Account Name *</label>
+                            <input type="text" id="ledgerAccountName" class="form-control" placeholder="e.g. Sales Account / Cash Ledger" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="ledgerAccountNumber">Account Number *</label>
+                            <input type="text" id="ledgerAccountNumber" class="form-control" placeholder="e.g. ACC-1004" required>
+                        </div>
+                    </div>
+                    <div class="grid-2" style="margin-bottom: 1rem;">
+                        <div class="input-group">
+                            <label for="ledgerMonthOf">Month of *</label>
+                            <input type="text" id="ledgerMonthOf" class="form-control" placeholder="e.g. August 2026" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="ledgerSheetNumber">Sheet Number</label>
+                            <input type="text" id="ledgerSheetNumber" class="form-control" value="1">
+                        </div>
+                    </div>
+
+                    <h3 style="font-size: 1rem; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.75rem; color: var(--primary);">Transactions</h3>
+                    <div class="table-wrapper">
+                        <table id="newLedgerTxTable">
+                            <thead>
+                                <tr>
+                                    <th width="120px">Date</th>
+                                    <th>Description</th>
+                                    <th width="110px">Journal Ref</th>
+                                    <th width="100px">Debit (₹)</th>
+                                    <th width="100px">Credit (₹)</th>
+                                    <th width="100px">Bal Debit</th>
+                                    <th width="100px">Bal Credit</th>
+                                    <th width="40px"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="newLedgerTxBody">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <button type="button" id="btnAddLedgerTxRow" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">+ Add Transaction Line</button>
+                </form>
+            </div>
+            <div class="modal-footer" style="margin-top: 1.5rem; text-align: right; display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn btn-secondary" id="btnCancelCreateLedger">Cancel</button>
+                <button class="btn btn-primary" id="btnSubmitCreateLedger">Save Ledger</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Ledger Modal -->
+    <div id="importLedgerModal" class="modal-overlay hidden">
+        <div class="modal-content card" style="max-width: 900px; width: 95%;">
+            <div class="modal-header">
+                <h2>📥 Import Ledger from Excel</h2>
+                <button class="close-modal" id="closeImportLedgerModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="upload-dropzone card" style="border: 2px dashed var(--accent); text-align: center; padding: 2rem; background: rgba(108,180,44,0.04); border-radius: 12px; margin-bottom: 1.5rem;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48" style="color: var(--accent); margin-bottom: 0.75rem;">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <p style="font-weight: 600; font-size: 1rem; margin-bottom: 0.5rem;">Select or Drag & Drop Excel File (.xlsx, .xls)</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Supports template format: Account Name, Account Number, Month of, Sheet Number, Date, Description, Journal Ref, Debit, Credit, Bal Debit, Bal Credit</p>
+                    <input type="file" id="ledgerFileInput" accept=".xlsx, .xls" style="display: none;">
+                    <button class="btn btn-primary" onclick="document.getElementById('ledgerFileInput').click()">📁 Choose Excel File</button>
+                    <span id="selectedFileName" style="margin-left: 10px; font-weight: 600; color: var(--primary);"></span>
+                </div>
+
+                <!-- Validation & Summary Container -->
+                <div id="importValidationContainer" class="hidden">
+                    <div id="importSummaryCard" class="card" style="padding: 1rem; margin-bottom: 1rem; border-left: 4px solid var(--accent);">
+                        <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem;">Validation Summary</h4>
+                        <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 0.9rem;">
+                            <span>Total Rows Processed: <strong id="summaryTotalRows">0</strong></span>
+                            <span style="color: #10b981;">Valid Records: <strong id="summaryValidRows">0</strong></span>
+                            <span style="color: #ef4444;">Invalid Records: <strong id="summaryInvalidRows">0</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- Error Messages Section -->
+                    <div id="importErrorsCard" class="card hidden" style="padding: 1rem; margin-bottom: 1rem; background: #fff5f5; border: 1px solid #fca5a5;">
+                        <h4 style="font-size: 0.95rem; font-weight: 700; color: #dc2626; margin-bottom: 0.5rem;">❌ Validation Errors (Fix errors to import)</h4>
+                        <ul id="importErrorList" style="margin: 0; padding-left: 1.25rem; font-size: 0.85rem; color: #991b1b; max-height: 180px; overflow-y: auto;">
+                            <!-- Error items -->
+                        </ul>
+                    </div>
+
+                    <!-- Preview Table -->
+                    <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem;">Import Preview</h4>
+                    <div class="table-wrapper" style="max-height: 250px; overflow-y: auto;">
+                        <table id="importPreviewTable" style="font-size: 0.8rem;">
+                            <thead>
+                                <tr>
+                                    <th>Row</th>
+                                    <th>Account Name</th>
+                                    <th>Account No</th>
+                                    <th>Month of</th>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Debit</th>
+                                    <th>Credit</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="importPreviewBody">
+                                <!-- Preview rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="margin-top: 1.5rem; text-align: right; display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn btn-secondary" id="btnCancelImportLedger">Cancel</button>
+                <button class="btn btn-primary" id="btnConfirmImportLedger" disabled>✅ Confirm & Create Ledgers</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View / Download Ledger Modal -->
+    <div id="viewLedgerModal" class="modal-overlay hidden">
+        <div class="modal-content card" style="max-width: 950px; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h2 id="viewLedgerTitle">Ledger Preview</h2>
+                <button class="close-modal" id="closeViewLedgerModal">×</button>
+            </div>
+            <div class="modal-body" style="flex: 1; overflow-y: auto; padding: 1.5rem;">
+                <div id="ledgerTemplateRenderHost" class="ledger-preview-card" style="background: white; color: #1e293b; padding: 25px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); font-family: 'Inter', sans-serif;">
+                    <!-- Template styled ledger document matching template image -->
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 1rem 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                <button class="btn btn-secondary" id="btnCloseViewLedger">Close</button>
+                <div style="display: flex; gap: 10px;">
+                    <button id="btnDownloadLedgerExcel" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                        Download Excel
+                    </button>
+                    <button id="btnDownloadLedgerPDF" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        Download PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Download Requests History Modal -->
+    <div id="downloadHistoryModal" class="modal-overlay hidden">
+        <div class="modal-content card" style="max-width: 800px; width: 95%;">
+            <div class="modal-header">
+                        <h2>📜 Download Requests History</h2>
+                <button class="close-modal" id="closeDownloadHistoryModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="table-wrapper" style="max-height: 350px; overflow-y: auto;">
+                    <table id="downloadHistoryTable">
+                        <thead>
+                            <tr>
+                                <th>Request ID</th>
+                                <th>Account</th>
+                                <th>File Type</th>
+                                <th>Date & Time</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="downloadHistoryBody">
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">
+                                    Loading history...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer" style="margin-top: 1rem; text-align: right;">
+                <button class="btn btn-secondary" id="btnCloseDownloadHistory">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Message Toast -->
+    <div id="successToast" class="toast hidden">
+        <div class="toast-content">
+            <span class="toast-icon">✅</span>
+            <span id="toastMessage">Action successful!</span>
+        </div>
+    </div>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(err => {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
+    </script>
+    <script src="location-handler.js"></script>
+</body>
+
+</html>

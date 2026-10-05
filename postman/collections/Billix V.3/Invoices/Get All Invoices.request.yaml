@@ -1,0 +1,5 @@
+$kind: http-request
+name: Get All Invoices
+method: GET
+url: 'http://localhost:5000/api/invoices'
+description: Retrieve all invoices sorted by creation date (newest first).

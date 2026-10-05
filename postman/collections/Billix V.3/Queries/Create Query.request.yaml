@@ -1,0 +1,16 @@
+$kind: http-request
+name: Create Query
+method: POST
+url: 'http://localhost:5000/api/queries'
+description: Submit a new query.
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "id": 1,
+      "text": "I have a question about my invoice.",
+      "status": "Pending"
+    }

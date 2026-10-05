@@ -1,0 +1,21 @@
+$kind: http-request
+name: Update Query
+method: PUT
+url: 'http://localhost:5000/api/queries/{{queryId}}'
+description: Update a query by its ID - mark as completed or add a reply.
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "status": "Resolved",
+      "replies": [
+        {
+          "id": 1,
+          "text": "Your query has been resolved.",
+          "sender": "Support"
+        }
+      ]
+    }

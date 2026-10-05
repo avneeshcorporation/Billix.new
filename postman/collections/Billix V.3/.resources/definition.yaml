@@ -1,0 +1,5 @@
+$kind: collection
+name: Billix V.3 API
+description: |-
+  API collection for the Billix V.3 invoicing and query management system.
+  Base URL: http://localhost:5000

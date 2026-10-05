@@ -1,0 +1,46 @@
+$kind: http-request
+name: Create Invoice
+method: POST
+url: 'http://localhost:5000/api/invoices'
+description: Save a new invoice to the database.
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "invNo": "INV-001",
+      "date": "2026-08-06T00:00:00.000Z",
+      "buyer": "John Doe",
+      "form": {
+        "companyName": "Acme Corp",
+        "address": "123 Main St"
+      },
+      "products": [
+        {
+          "name": "Product A",
+          "qty": 2,
+          "price": 50.00
+        }
+      ]
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status code is 201", function () {
+        pm.response.to.have.status(201);
+      });
+      pm.test("Response has _id field", function () {
+        const json = pm.response.json();
+        pm.expect(json).to.have.property('_id');
+      });
+      pm.test("Response has correct invNo", function () {
+        const json = pm.response.json();
+        pm.expect(json.invNo).to.eql("INV-001");
+      });
+      pm.test("Response has correct buyer", function () {
+        const json = pm.response.json();
+        pm.expect(json.buyer).to.eql("John Doe");
+      });

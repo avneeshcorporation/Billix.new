@@ -1,0 +1,168 @@
+{
+	"info": {
+		"_postman_id": "b1111x00-api0-4000-8000-collection00",
+		"name": "Billix V.3 API Collection",
+		"description": "Postman Collection for testing Billix V.3 APIs (Invoices and Queries)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Invoices",
+			"item": [
+				{
+					"name": "Get All Invoices",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/invoices",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"invoices"
+							]
+						},
+						"description": "Fetches all invoices sorted by creation date descending"
+					},
+					"response": []
+				},
+				{
+					"name": "Save New Invoice",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"invNo\": \"INV-1001\",\n  \"date\": \"2026-08-07T00:00:00.000Z\",\n  \"buyer\": \"Acme Corporation\",\n  \"form\": {\n    \"paymentTerms\": \"Net 30\",\n    \"notes\": \"Thank you for your business\"\n  },\n  \"products\": [\n    {\n      \"name\": \"Web Development Services\",\n      \"qty\": 1,\n      \"price\": 1500\n    }\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/invoices",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"invoices"
+							]
+						},
+						"description": "Saves a new invoice document to MongoDB"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Queries",
+			"item": [
+				{
+					"name": "Get All Queries",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/queries",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"queries"
+							]
+						},
+						"description": "Fetches all customer queries sorted by date descending"
+					},
+					"response": []
+				},
+				{
+					"name": "Create New Query",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"id\": 101,\n  \"text\": \"How do I download the invoice PDF?\",\n  \"status\": \"Pending\",\n  \"replies\": []\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/queries",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"queries"
+							]
+						},
+						"description": "Creates a new customer support query"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Query by ID",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"Completed\",\n  \"replies\": [\n    {\n      \"id\": 1,\n      \"text\": \"You can click the Print/PDF button on the top right.\",\n      \"sender\": \"Support Agent\"\n    }\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/queries/101",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"queries",
+								"101"
+							]
+						},
+						"description": "Updates a query status or adds replies using the custom numeric id"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000",
+			"type": "string"
+		}
+	]
+}
