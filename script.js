@@ -10,6 +10,8 @@ let homeView, helpView, queryListContainer, queryModal, btnOpenQueryForm, closeQ
 
 let activeEditor = null;
 let invoiceDateEditedByUser = false;
+let isRaisingPDFRequest = false;
+let isDownloadingPDFRequest = false;
 
 function getLocalDateInputValue(date = new Date()) {
     const year = date.getFullYear();
@@ -298,6 +300,19 @@ function setupEventListeners() {
         });
     }
 
+    window.addEventListener('beforeprint', () => {
+        const invoiceView = document.getElementById('createInvoiceView');
+        const isInvoiceVisible = Boolean(invoiceView && !invoiceView.classList.contains('hidden'));
+        document.body.classList.toggle('printing-invoice', isInvoiceVisible);
+        if (isInvoiceVisible) {
+            syncAllToPreview();
+            updatePreviewTable();
+            const copyLabel = document.getElementById('invoicePreview')?.querySelector('#copyText');
+            if (copyLabel && copySelector) copyLabel.textContent = `(${copySelector.value})`;
+        }
+    });
+    window.addEventListener('afterprint', () => document.body.classList.remove('printing-invoice'));
+
     // Dark Mode Toggle
     if (darkModeBtn) {
         darkModeBtn.addEventListener('click', () => {
@@ -361,23 +376,49 @@ function setupEventListeners() {
 
     // Dropdown Toggle
     if (downloadBtn) {
+        const dropdown = downloadBtn.closest('.dropdown');
+        const setDropdownOpen = (open) => {
+            dropdown?.classList.toggle('open', open);
+            downloadBtn.setAttribute('aria-expanded', String(open));
+        };
+
+        downloadBtn.setAttribute('aria-haspopup', 'true');
+        downloadBtn.setAttribute('aria-expanded', 'false');
         downloadBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            downloadBtn.parentElement.classList.toggle('open');
+            setDropdownOpen(!dropdown?.classList.contains('open'));
         });
 
         // Dropdown item selection (Raises PDF Download Request for selected option)
         dropdownItems.forEach(item => {
             item.addEventListener('click', () => {
                 const copyType = item.getAttribute('data-copy');
-                requestPDFDownload(copyType);
-                downloadBtn.parentElement.classList.remove('open');
+                if (isRaisingPDFRequest) return;
+                isRaisingPDFRequest = true;
+                downloadBtn.disabled = true;
+                dropdownItems.forEach(option => { option.disabled = true; });
+                try {
+                    requestPDFDownload(copyType);
+                } finally {
+                    setDropdownOpen(false);
+                    window.setTimeout(() => {
+                        isRaisingPDFRequest = false;
+                        downloadBtn.disabled = false;
+                        dropdownItems.forEach(option => { option.disabled = false; });
+                    }, 350);
+                }
             });
         });
 
-        // Close dropdown clicking outside
-        window.addEventListener('click', () => {
-            downloadBtn.parentElement.classList.remove('open');
+        // Close the menu on an outside click or Escape without swallowing item actions.
+        window.addEventListener('click', (e) => {
+            if (!dropdown?.contains(e.target)) setDropdownOpen(false);
+        });
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && dropdown?.classList.contains('open')) {
+                setDropdownOpen(false);
+                downloadBtn.focus();
+            }
         });
     }
 
@@ -1368,9 +1409,9 @@ async function generatePDF(copyType, { returnBlob = false } = {}) {
 
     const invoicePreview = document.getElementById('invoicePreview');
     if (!invoicePreview) {
-        console.error("Invoice preview not found");
-        return;
+        throw new Error('Invoice preview not found.');
     }
+    if (typeof html2pdf !== 'function') throw new Error('PDF generator is not available. Refresh the page and try again.');
 
     // A saved invoice restore can sync blank Ship To form fields over the
     // checked Same as Bill To preview. Reapply that setting before cloning the
@@ -1382,9 +1423,10 @@ async function generatePDF(copyType, { returnBlob = false } = {}) {
     }
 
     const invNo = getFieldVal('invoiceNo') || 'Draft';
+    const safeInvNo = String(invNo).replace(/[\\/:*?"<>|]/g, '_');
     const copies = copyType === 'ALL' ?
         ["ORIGINAL FOR RECIPIENT", "DUPLICATE FOR TRANSPORTER", "SUPPLIER COPY"] :
-        [copyType];
+        [copyType || "ORIGINAL FOR RECIPIENT"];
 
     // 1. Create a hidden iframe for 100% style and layout isolation
     const iframe = document.createElement('iframe');
@@ -1393,9 +1435,11 @@ async function generatePDF(copyType, { returnBlob = false } = {}) {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         visibility: hidden; pointer-events: none; z-index: -9999;
     `;
-    document.body.appendChild(iframe);
+    try {
+        document.body.appendChild(iframe);
 
     const frameDoc = iframe.contentWindow.document;
+    const frameLoaded = new Promise(resolve => { iframe.onload = resolve; });
 
     // 2. Extract all current document styles to maintain pixel-perfect matching
     let stylesHtml = '';
@@ -1405,7 +1449,7 @@ async function generatePDF(copyType, { returnBlob = false } = {}) {
 
     // 3. Build the isolated content for the PDF
     let contentHtml = '';
-    copies.forEach((title, index) => {
+    copies.forEach(title => {
         const clone = invoicePreview.cloneNode(true);
         clone.removeAttribute('id');
 
@@ -1418,9 +1462,9 @@ async function generatePDF(copyType, { returnBlob = false } = {}) {
         pageWrapper.className = 'pdf-page'; // Use class for CSS-based breaks
         pageWrapper.style.cssText = `
             width: 210mm; 
-            height: 296.8mm; 
-            overflow: hidden;
-            padding: 10mm; 
+            min-height: 297mm;
+            overflow: visible;
+            padding: 8mm;
             margin: 0 auto; 
             background: #ffffff; 
             box-sizing: border-box;
@@ -1436,7 +1480,10 @@ async function generatePDF(copyType, { returnBlob = false } = {}) {
             border: none !important;
             width: 100% !important;
             min-width: 0 !important;
+            min-height: 0 !important;
+            height: auto !important;
             max-width: 100% !important;
+            overflow: visible !important;
             margin: 0 !important;
             display: block !important;
             visibility: visible !important;
@@ -1454,6 +1501,7 @@ async function generatePDF(copyType, { returnBlob = false } = {}) {
         <html>
         <head>
             <meta charset="UTF-8">
+            <base href="${document.baseURI}">
             ${stylesHtml}
             <style>
                 html, body { 
@@ -1461,14 +1509,15 @@ async function generatePDF(copyType, { returnBlob = false } = {}) {
                     padding: 0 !important; 
                     background: #ffffff !important; 
                 }
-                * { 
-                    -webkit-print-color-adjust: exact !important; 
-                    color-adjust: exact !important; 
-                    margin-bottom: 0 !important; /* Prevent bottom-heavy overflow */
+                * {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
                 }
                 #pdf-render-target { width: 210mm; margin: 0 auto; }
-                .pdf-page { break-after: page; }
-                .pdf-page:last-child { break-after: avoid; }
+                .pdf-page { break-after: page; page-break-after: always; break-inside: auto; }
+                .pdf-page:last-child { break-after: auto; page-break-after: auto; }
+                .pdf-page table { page-break-inside: auto; break-inside: auto; }
+                .pdf-page tr { page-break-inside: avoid; break-inside: avoid; }
                 .invoice-footer { margin-top: 5mm !important; margin-bottom: 0 !important; }
             </style>
         </head>
@@ -1479,21 +1528,22 @@ async function generatePDF(copyType, { returnBlob = false } = {}) {
     `);
     frameDoc.close();
 
-    // 5. Wait for the iframe and all its resources (CSS, fonts) to load fully
-    await new Promise(resolve => {
-        if (frameDoc.readyState === 'complete') resolve();
-        else iframe.onload = resolve;
-    });
+    // Wait for copied styles, then let available fonts settle before capture.
+    if (frameDoc.readyState !== 'complete') {
+        await Promise.race([
+            frameLoaded,
+            new Promise((_, reject) => window.setTimeout(() => reject(new Error('PDF styles took too long to load.')), 15000))
+        ]);
+    }
+    if (frameDoc.fonts?.ready) {
+        await Promise.race([frameDoc.fonts.ready, new Promise(resolve => window.setTimeout(resolve, 4000))]);
+    }
 
-    // Safe delay to ensure Google Fonts and layout reflows are stabilized
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    try {
         const target = frameDoc.getElementById('pdf-render-target');
 
         const opt = {
             margin: 0,
-            filename: `Invoice_${invNo}.pdf`,
+            filename: `Invoice_${safeInvNo}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: {
                 scale: 2,
@@ -1505,7 +1555,7 @@ async function generatePDF(copyType, { returnBlob = false } = {}) {
                 scrollX: 0
             },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
-            pagebreak: { mode: 'css', avoid: '.pdf-page' }
+            pagebreak: { mode: ['css', 'legacy'], avoid: ['tr'] }
         };
 
         const pdfWorker = html2pdf().set(opt).from(target);
@@ -1516,8 +1566,8 @@ async function generatePDF(copyType, { returnBlob = false } = {}) {
         showToast("PDF Generated Successfully", "✅");
     } catch (error) {
         console.error("Critical Isolated PDF Failure:", error);
-        if (returnBlob) throw error;
         showToast("PDF Generation Failed", "❌");
+        throw error;
     } finally {
         // Cleanup the isolation layer
         if (iframe.parentNode) document.body.removeChild(iframe);
@@ -2013,6 +2063,10 @@ const PDF_REQUESTS_KEY = 'billix-pdf-requests';
  * Does NOT generate a PDF immediately — raises an on-demand request for the PDF download section.
  */
 function requestPDFDownload(requestedCopyType) {
+    if (!invoiceForm || !productBody) {
+        showToast('Invoice form is not ready. Refresh the page and try again.', '❌');
+        return false;
+    }
     const copyType = requestedCopyType || document.getElementById('copySelector')?.value || 'ORIGINAL FOR RECIPIENT';
     const invNo = getFieldVal('invoiceNo') || 'Draft';
     const buyer = getFieldVal('buyerName') || 'Unknown Buyer';
@@ -2050,9 +2104,16 @@ function requestPDFDownload(requestedCopyType) {
     });
 
     // Load existing requests and prepend the new one
-    const existing = JSON.parse(localStorage.getItem(PDF_REQUESTS_KEY) || '[]');
-    existing.unshift(state);
-    localStorage.setItem(PDF_REQUESTS_KEY, JSON.stringify(existing));
+    try {
+        const existing = JSON.parse(localStorage.getItem(PDF_REQUESTS_KEY) || '[]');
+        if (!Array.isArray(existing)) throw new Error('Stored PDF request list is invalid.');
+        existing.unshift(state);
+        localStorage.setItem(PDF_REQUESTS_KEY, JSON.stringify(existing));
+    } catch (error) {
+        console.error('Unable to save PDF request:', error);
+        showToast('Could not save the PDF request. Check browser storage and try again.', '❌');
+        return false;
+    }
 
     const copyLabels = {
         'ORIGINAL FOR RECIPIENT': 'Original',
@@ -2063,6 +2124,7 @@ function requestPDFDownload(requestedCopyType) {
     const label = copyLabels[copyType] || copyType;
 
     showToast(`PDF Download Request raised for ${invNo} (${label}). Go to PDF Downloads to download.`, '✅');
+    return true;
 }
 
 /**
@@ -2163,6 +2225,8 @@ window.downloadRequestedPDF = async (requestId) => {
 
     showToast(`Generating PDF for Invoice ${req.invNo}...`, '🔄');
 
+    if (isDownloadingPDFRequest) return;
+    isDownloadingPDFRequest = true;
     try {
         await downloadLatestSavedInvoice(req);
 
@@ -2172,9 +2236,11 @@ window.downloadRequestedPDF = async (requestId) => {
 
         // Refresh the view
         renderPDFDownloadsView();
+        isDownloadingPDFRequest = false;
         showToast(`PDF for Invoice ${req.invNo} downloaded successfully`, '✅');
     } catch (err) {
         console.error('PDF download request error:', err);
+        isDownloadingPDFRequest = false;
         showToast('Failed to generate PDF', '❌');
     }
 };

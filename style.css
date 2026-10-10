@@ -4254,3 +4254,86 @@ body.dark-mode #aboutView .about-milestone-card h3 { color: #f0f8ec; }
     }
     .invoice-container.sks-invoice { box-shadow: none !important; }
 }
+
+/* Print only the active invoice preview and allow its content to paginate. */
+@media print {
+    @page {
+        size: A4 portrait;
+        margin: 8mm;
+    }
+
+    html,
+    body {
+        width: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        background: #fff !important;
+    }
+
+    body.printing-invoice * {
+        visibility: hidden !important;
+    }
+
+    body.printing-invoice #invoicePreview,
+    body.printing-invoice #invoicePreview * {
+        visibility: visible !important;
+    }
+
+    body.printing-invoice #createInvoiceView,
+    body.printing-invoice .workspace,
+    body.printing-invoice .preview-pane {
+        display: block !important;
+        position: static !important;
+        width: auto !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    body.printing-invoice #invoicePreview {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 194mm !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        transform: none !important;
+        box-shadow: none !important;
+        border: none !important;
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+    }
+
+    body.printing-invoice #invoicePreview table {
+        width: 100% !important;
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+    }
+
+    body.printing-invoice #invoicePreview thead {
+        display: table-header-group;
+    }
+
+    body.printing-invoice #invoicePreview tfoot {
+        display: table-footer-group;
+    }
+
+    body.printing-invoice #invoicePreview tr {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    body.printing-invoice #invoicePreview td,
+    body.printing-invoice #invoicePreview th {
+        overflow: visible !important;
+        overflow-wrap: anywhere !important;
+        word-break: normal !important;
+    }
+}
