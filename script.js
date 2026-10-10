@@ -1324,7 +1324,7 @@ function numberToWords(num) {
 }
 
 // PDF Generation Logic
-async function generatePDF(copyType) {
+async function generatePDF(copyType, { returnBlob = false } = {}) {
     showToast("Preparing High-Fidelity PDF...", "🔄");
 
     const invoicePreview = document.getElementById('invoicePreview');
@@ -1469,11 +1469,15 @@ async function generatePDF(copyType) {
             pagebreak: { mode: 'css', avoid: '.pdf-page' }
         };
 
-        await html2pdf().set(opt).from(target).save();
+        const pdfWorker = html2pdf().set(opt).from(target);
+        if (returnBlob) return await pdfWorker.outputPdf('blob');
+
+        await pdfWorker.save();
         await saveToHistory(copyType);
         showToast("PDF Generated Successfully", "✅");
     } catch (error) {
         console.error("Critical Isolated PDF Failure:", error);
+        if (returnBlob) throw error;
         showToast("PDF Generation Failed", "❌");
     } finally {
         // Cleanup the isolation layer
@@ -1615,7 +1619,7 @@ function saveCurrentStateAsLatest(copyType) {
     localStorage.setItem('billix-latest-invoice', JSON.stringify(state));
 }
 
-async function downloadLatestSavedInvoice(state) {
+async function downloadLatestSavedInvoice(state, { returnBlob = false } = {}) {
     // To generate the PDF, we need the DOM to have the data.
     // We'll backup current state, load saved state, generate, then restore.
     const backup = {
@@ -1667,7 +1671,13 @@ async function downloadLatestSavedInvoice(state) {
     syncAllToPreview();
     calculateTotals();
 
-    await generatePDF(state.copyType);
+    let generatedBlob;
+    let generationError;
+    try {
+        generatedBlob = await generatePDF(state.copyType, { returnBlob });
+    } catch (error) {
+        generationError = error;
+    }
 
     // Restore backup
     for (const [id, val] of Object.entries(backup.form)) {
@@ -1699,6 +1709,9 @@ async function downloadLatestSavedInvoice(state) {
 
     syncAllToPreview();
     calculateTotals();
+
+    if (generationError) throw generationError;
+    return generatedBlob;
 }
 
 
@@ -2078,6 +2091,12 @@ function renderPDFDownloadsView() {
                     </svg>
                     Download PDF
                 </button>
+                <button class="btn btn-secondary btn-sm" onclick="shareRequestedPDF('${req.requestId}')" title="Share this PDF using your phone's share menu and choose WhatsApp" style="display: flex; align-items: center; gap: 6px; color: #128C7E; border-color: #128C7E;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="currentColor">
+                        <path d="M12.04 2a9.9 9.9 0 0 0-8.48 15.01L2 22l5.16-1.51A9.95 9.95 0 1 0 12.04 2Zm0 18.1a8.1 8.1 0 0 1-4.13-1.13l-.3-.18-3.06.9.92-2.98-.2-.31a8.12 8.12 0 1 1 6.77 3.7Zm4.46-6.08c-.24-.12-1.43-.71-1.65-.79-.22-.08-.38-.12-.54.12-.16.24-.62.79-.76.95-.14.16-.28.18-.52.06-.24-.12-1.02-.38-1.94-1.2-.72-.64-1.2-1.43-1.34-1.67-.14-.24-.02-.37.1-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.3-.74-1.78-.2-.47-.4-.4-.54-.4h-.46c-.16 0-.42.06-.64.3-.22.24-.84.82-.84 2s.86 2.31.98 2.47c.12.16 1.69 2.58 4.1 3.62.57.25 1.02.4 1.37.51.58.18 1.1.16 1.51.1.46-.07 1.43-.58 1.63-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28Z" />
+                    </svg>
+                    Share on WhatsApp
+                </button>
                 <button class="btn btn-secondary btn-sm" onclick="deletePDFRequest('${req.requestId}')" style="display: flex; align-items: center; gap: 6px; color: #ef4444;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
@@ -2119,6 +2138,70 @@ window.downloadRequestedPDF = async (requestId) => {
     } catch (err) {
         console.error('PDF download request error:', err);
         showToast('Failed to generate PDF', '❌');
+    }
+};
+
+/** Regenerates one requested invoice and shares the PDF through the device share sheet. */
+window.shareRequestedPDF = async (requestId) => {
+    const requests = JSON.parse(localStorage.getItem(PDF_REQUESTS_KEY) || '[]');
+    const req = requests.find(r => r.requestId === requestId);
+    if (!req) {
+        showToast('Request not found', 'âŒ');
+        return;
+    }
+
+    showToast(`Preparing Invoice ${req.invNo} to share...`, 'ðŸ”„');
+
+    try {
+        const pdfBlob = await downloadLatestSavedInvoice(req, { returnBlob: true });
+        if (!(pdfBlob instanceof Blob) || pdfBlob.size === 0) {
+            throw new Error('The invoice PDF could not be generated.');
+        }
+
+        const safeInvoiceNumber = String(req.invNo || 'Draft').replace(/[^a-z0-9._-]/gi, '_');
+        const fileName = `Invoice_${safeInvoiceNumber}.pdf`;
+        const file = typeof File === 'function'
+            ? new File([pdfBlob], fileName, { type: 'application/pdf' })
+            : null;
+        let canShareFile = false;
+        try {
+            canShareFile = Boolean(file && navigator.share && navigator.canShare && navigator.canShare({ files: [file] }));
+        } catch (shareCheckError) {
+            console.warn('File sharing is unavailable in this browser:', shareCheckError);
+        }
+
+        if (canShareFile) {
+            try {
+                await navigator.share({
+                    files: [file],
+                    title: `Invoice ${req.invNo || ''}`.trim(),
+                    text: `Invoice ${req.invNo || ''}`.trim()
+                });
+                return;
+            } catch (shareError) {
+                if (shareError?.name === 'AbortError') return;
+                console.warn('Native file sharing failed; switching to download fallback:', shareError);
+            }
+        }
+
+        // Browsers without file sharing still get the PDF and a WhatsApp message
+        // window; the user can attach the downloaded file there.
+        const objectUrl = URL.createObjectURL(pdfBlob);
+        const downloadLink = document.createElement('a');
+        downloadLink.href = objectUrl;
+        downloadLink.download = fileName;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        downloadLink.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+
+        const whatsappText = encodeURIComponent(`Invoice ${req.invNo || ''} is ready. Please see the attached PDF.`);
+        window.open(`https://wa.me/?text=${whatsappText}`, '_blank', 'noopener,noreferrer');
+        showToast('PDF downloaded. Attach it in WhatsApp to send.', 'âœ…');
+    } catch (error) {
+        if (error?.name === 'AbortError') return;
+        console.error('PDF share error:', error);
+        showToast('Unable to prepare the PDF for sharing', 'âŒ');
     }
 };
 
