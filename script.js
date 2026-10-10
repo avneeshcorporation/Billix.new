@@ -1669,70 +1669,69 @@ async function downloadLatestSavedInvoice(state, { returnBlob = false } = {}) {
         }
     });
 
-    // Load saved state
-    for (const [id, val] of Object.entries(state.form)) {
-        const el = document.getElementById(id);
-        if (el) {
-            if (el.classList.contains('rich-editable')) el.innerHTML = val;
-            else el.value = val;
-        }
-    }
-
-    // Load products
-    productBody.innerHTML = '';
-    state.products.forEach(p => {
-        addNewRow();
-        const row = productBody.lastElementChild;
-        row.querySelector('.product-desc').value = p.desc;
-        row.querySelector('.product-hsn').value = p.hsn;
-        row.querySelector('.product-qty').value = p.qty;
-        row.querySelector('.product-rate').value = p.rate;
-        row.querySelector('.product-unit').value = p.qtyUnit;
-        row.querySelector('.product-rate-unit').value = p.rateUnit;
-    });
-
-    // Trigger sync and generation
-    syncAllToPreview();
-    calculateTotals();
-
     let generatedBlob;
     let generationError;
     try {
+        // Load saved form state. Editable divs do not have a value property.
+        for (const [id, val] of Object.entries(state.form || {})) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+            if (el.classList.contains('rich-editable')) el.innerHTML = val ?? '';
+            else el.value = val ?? '';
+        }
+
+        // Recreate the product rows using the same element type-aware mapping
+        // used by capture, so rich-editable descriptions and HSN codes survive.
+        productBody.innerHTML = '';
+        (state.products || []).forEach(p => {
+            addNewRow();
+            const row = productBody.lastElementChild;
+            const descEl = row.querySelector('.product-desc');
+            const hsnEl = row.querySelector('.product-hsn');
+            if (descEl.classList.contains('rich-editable')) descEl.innerHTML = p.desc ?? '';
+            else descEl.value = p.desc ?? '';
+            if (hsnEl.classList.contains('rich-editable')) hsnEl.innerHTML = p.hsn ?? '';
+            else hsnEl.value = p.hsn ?? '';
+            row.querySelector('.product-qty').value = p.qty ?? 0;
+            row.querySelector('.product-rate').value = p.rate ?? 0;
+            row.querySelector('.product-unit').value = p.qtyUnit || 'KGS';
+            row.querySelector('.product-rate-unit').value = p.rateUnit || 'Per KGS';
+        });
+
+        // Trigger sync and generation after the DOM has the saved values.
+        syncAllToPreview();
+        calculateTotals();
         generatedBlob = await generatePDF(state.copyType, { returnBlob });
     } catch (error) {
         generationError = error;
-    }
-
-    // Restore backup
-    for (const [id, val] of Object.entries(backup.form)) {
-        const el = document.getElementById(id);
-        if (el) {
-            if (el.classList.contains('rich-editable')) el.innerHTML = val;
-            else el.value = val;
+    } finally {
+        // Restore the user's current form even if PDF rendering throws.
+        for (const [id, val] of Object.entries(backup.form)) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+            if (el.classList.contains('rich-editable')) el.innerHTML = val ?? '';
+            else el.value = val ?? '';
         }
+
+        productBody.innerHTML = '';
+        backup.products.forEach(p => {
+            addNewRow();
+            const row = productBody.lastElementChild;
+            const descEl = row.querySelector('.product-desc');
+            const hsnEl = row.querySelector('.product-hsn');
+            if (descEl.classList.contains('rich-editable')) descEl.innerHTML = p.desc ?? '';
+            else descEl.value = p.desc ?? '';
+            if (hsnEl.classList.contains('rich-editable')) hsnEl.innerHTML = p.hsn ?? '';
+            else hsnEl.value = p.hsn ?? '';
+            row.querySelector('.product-qty').value = p.qty ?? 0;
+            row.querySelector('.product-rate').value = p.rate ?? 0;
+            row.querySelector('.product-unit').value = p.qtyUnit || 'KGS';
+            row.querySelector('.product-rate-unit').value = p.rateUnit || 'Per KGS';
+        });
+
+        syncAllToPreview();
+        calculateTotals();
     }
-
-    productBody.innerHTML = '';
-    backup.products.forEach(p => {
-        addNewRow();
-        const row = productBody.lastElementChild;
-        const descEl = row.querySelector('.product-desc');
-        const hsnEl = row.querySelector('.product-hsn');
-
-        if (descEl.classList.contains('rich-editable')) descEl.innerHTML = p.desc;
-        else descEl.value = p.desc;
-
-        if (hsnEl.classList.contains('rich-editable')) hsnEl.innerHTML = p.hsn;
-        else hsnEl.value = p.hsn;
-
-        row.querySelector('.product-qty').value = p.qty;
-        row.querySelector('.product-rate').value = p.rate;
-        row.querySelector('.product-unit').value = p.qtyUnit;
-        row.querySelector('.product-rate-unit').value = p.rateUnit;
-    });
-
-    syncAllToPreview();
-    calculateTotals();
 
     if (generationError) throw generationError;
     return generatedBlob;
