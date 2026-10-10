@@ -116,7 +116,7 @@
             color: #1e40af !important;
         }
     </style>
-    <link rel="stylesheet" href="style.css?v=20261010-mobile-fit">
+    <link rel="stylesheet" href="style.css?v=20261010-about-us">
 </head>
 
 <body>
@@ -156,7 +156,7 @@
                         </svg>
                     </button>
                 </div>
-                <div class="sidebar-menu">
+                <div class="sidebar-menu" aria-label="Main navigation" tabindex="0">
                     <button class="sidebar-btn active" data-view="home" title="Home">
                         <span class="icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -247,6 +247,18 @@
                             </svg>
                         </span>
                         <span class="btn-text">Profile</span>
+                    </button>
+                    <button class="sidebar-btn" data-view="about" title="About Billix">
+                        <span class="icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" width="1.2rem" height="1.2rem"
+                                aria-hidden="true">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M12 11v5"></path>
+                                <path d="M12 8h.01"></path>
+                            </svg>
+                        </span>
+                        <span class="btn-text">About Us</span>
                     </button>
                 </div>
                 <div class="sidebar-footer">
@@ -503,6 +515,19 @@
                         </div>
                     </section>
 
+                    <section class="founder-section" aria-labelledby="founder-title">
+                        <div class="founder-copy">
+                            <span class="founder-eyebrow">MEET OUR CEO</span>
+                            <h2 id="founder-title">Shivam Tripathi</h2>
+                            <p class="founder-role">Founder &amp; CEO</p>
+                            <p class="founder-bio">Shivam Tripathi leads Billix with a vision to simplify business management through technology, automation, and innovation. He is focused on building practical digital solutions that help businesses streamline invoicing and improve operational efficiency.</p>
+                        </div>
+                        <div class="founder-portrait-wrap">
+                            <div class="founder-portrait-glow" aria-hidden="true"></div>
+                            <img class="founder-portrait" src="ceo-profile.jfif" alt="Portrait of the Billix CEO" loading="lazy" decoding="async">
+                        </div>
+                    </section>
+
                     <footer class="home-footer">
                         <p>Billix v2.0 - Where Billing Meets Efficiency</p>
                         <div class="footer-links">
@@ -511,6 +536,88 @@
                             <a href="#">Terms of Use</a>
                         </div>
                     </footer>
+                </div>
+
+                <!-- About Us View -->
+                <div id="aboutView" class="view-section about-view hidden">
+                    <section class="about-hero" aria-labelledby="about-title">
+                        <div class="about-hero-copy">
+                            <span class="about-eyebrow">ABOUT BILLIX</span>
+                            <h1 id="about-title">Simplifying Billing.<br><span>Empowering Businesses.</span></h1>
+                            <p>Billix brings practical invoicing and business tools together to help teams manage everyday billing with greater clarity and less effort.</p>
+                        </div>
+                        <div class="about-hero-art" aria-hidden="true">
+                            <div class="about-orbit about-orbit-one"></div>
+                            <div class="about-orbit about-orbit-two"></div>
+                            <div class="about-art-card about-art-back"><span>GST</span><i></i><i></i><i></i></div>
+                            <div class="about-art-card about-art-front"><span>₹</span><i></i><i></i><b>INVOICE</b></div>
+                        </div>
+                    </section>
+
+                    <section class="about-section" aria-labelledby="about-clients-title">
+                        <div class="about-section-heading">
+                            <span class="about-eyebrow">THE BUSINESSES WE SERVE</span>
+                            <h2 id="about-clients-title">Our Clients</h2>
+                            <p>Billix supports teams across different businesses with clear, organized invoicing.</p>
+                        </div>
+                        <div class="about-client-grid">
+                            <div class="about-client-card"><span class="about-client-mark">AC</span><span>Avneesh Corporation</span></div>
+                            <div class="about-client-card"><span class="about-client-mark">SK</span><span>Shree Kedarnath Steels</span></div>
+                            <div class="about-client-card"><span class="about-client-mark">EP</span><span>Eptain Pvt. Ltd.</span></div>
+                            <div class="about-client-card"><span class="about-client-mark">MX</span><span>Matrix</span></div>
+                            <div class="about-client-card"><span class="about-client-mark">IG</span><span>Intech Glob</span></div>
+                        </div>
+                    </section>
+
+                    <section class="about-section about-progress" aria-labelledby="about-progress-title">
+                        <div class="about-section-heading">
+                            <span class="about-eyebrow">BUILT SO FAR</span>
+                            <h2 id="about-progress-title">Our Progress</h2>
+                            <p>Our progress is reflected in useful capabilities already built into Billix.</p>
+                        </div>
+                        <div class="about-milestone-grid">
+                            <article class="about-milestone-card">
+                                <span class="about-milestone-number">01</span>
+                                <h3>GST invoicing</h3>
+                                <p>Create invoices with GST details, product lines, and automatic tax calculations.</p>
+                            </article>
+                            <article class="about-milestone-card">
+                                <span class="about-milestone-number">02</span>
+                                <h3>Business-specific formats</h3>
+                                <p>The invoice editor includes dedicated layouts for Avneesh Corporation and Shree Kedarnath Steels.</p>
+                            </article>
+                            <article class="about-milestone-card">
+                                <span class="about-milestone-number">03</span>
+                                <h3>Connected records</h3>
+                                <p>Manage invoice history, dashboard filters, ledgers, and downloadable PDF copies.</p>
+                            </article>
+                        </div>
+                    </section>
+
+                    <section class="about-purpose-grid" aria-label="Our mission and vision">
+                        <article class="about-purpose-card">
+                            <span class="about-eyebrow">WHY WE EXIST</span>
+                            <h2>Our Mission</h2>
+                            <p>To simplify billing and day-to-day business management through useful technology, automation, and practical digital tools.</p>
+                        </article>
+                        <article class="about-purpose-card about-vision-card">
+                            <span class="about-eyebrow">WHERE WE’RE GOING</span>
+                            <h2>Our Vision</h2>
+                            <p>To help businesses work with clarity and confidence by making essential business tools more efficient and accessible.</p>
+                        </article>
+                    </section>
+
+                    <section class="about-ceo-card" aria-labelledby="about-ceo-name">
+                        <div class="about-ceo-photo-wrap">
+                            <img src="ceo-profile.jfif" alt="Shivam Tripathi, Founder and CEO of Billix" loading="lazy" decoding="async">
+                        </div>
+                        <div class="about-ceo-copy">
+                            <span class="about-eyebrow">LEADERSHIP</span>
+                            <h2 id="about-ceo-name">Shivam Tripathi</h2>
+                            <p class="about-ceo-role">Founder &amp; CEO of Billix</p>
+                            <p>Shivam Tripathi leads Billix with a vision to simplify business management through technology, automation, and innovation. He is focused on building practical digital solutions that help businesses streamline invoicing and improve operational efficiency.</p>
+                        </div>
+                    </section>
                 </div>
 
                 <!-- Dashboard View -->
@@ -1855,8 +1962,14 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: url('login-bg.png') no-repeat center center !important;
-            background-size: cover !important;
+            padding: 1.5rem;
+            overflow-y: auto;
+            perspective: 1400px;
+            isolation: isolate;
+            background:
+                radial-gradient(ellipse at center, rgba(4, 10, 6, 0.2), rgba(4, 10, 6, 0.52)),
+                linear-gradient(135deg, rgba(5, 13, 8, 0.18), rgba(5, 13, 8, 0.38)),
+                url('login-tax-3d.png') center / cover no-repeat !important;
             z-index: 2000;
             display: flex;
             align-items: center;
@@ -1864,7 +1977,128 @@
             transition: opacity 0.5s ease;
         }
 
-        .login-card {
+        #loginOverlay::before,
+        #loginOverlay::after {
+            content: "";
+            position: fixed;
+            z-index: -1;
+            pointer-events: none;
+            border: 1px solid rgba(151, 224, 94, 0.16);
+            border-radius: 50%;
+            transform: rotateX(65deg) rotateZ(-24deg);
+        }
+
+        #loginOverlay::before {
+            width: min(72vw, 720px);
+            height: min(72vw, 720px);
+            box-shadow: 0 0 70px rgba(108, 180, 44, 0.08), inset 0 0 70px rgba(108, 180, 44, 0.05);
+        }
+
+        #loginOverlay::after {
+            width: min(50vw, 500px);
+            height: min(50vw, 500px);
+            border-color: rgba(151, 224, 94, 0.09);
+        }
+
+        #loginOverlay .login-card {
+            position: relative;
+            width: min(100%, 420px);
+            max-height: calc(100vh - 3rem);
+            overflow-y: auto;
+            padding: 2.6rem 2.4rem 2.3rem;
+            background: linear-gradient(145deg, rgba(28, 40, 30, 0.97), rgba(12, 20, 14, 0.96));
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(164, 232, 105, 0.26);
+            border-radius: 24px;
+            box-shadow: 22px 26px 60px rgba(0, 0, 0, 0.58),
+                0 0 0 1px rgba(255, 255, 255, 0.035) inset,
+                0 0 55px rgba(108, 180, 44, 0.14);
+            color: white;
+            text-align: center;
+            transform: rotateX(3deg) rotateY(-5deg) translateY(-5px);
+            transform-style: preserve-3d;
+            animation: login-card-float 6s ease-in-out infinite;
+            transition: transform 300ms ease, box-shadow 300ms ease;
+        }
+
+        #loginOverlay .login-card::before {
+            content: "";
+            position: absolute;
+            inset: 0 18% auto;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(190, 255, 147, 0.85), transparent);
+            pointer-events: none;
+        }
+
+        #loginOverlay .login-card:hover {
+            transform: rotateX(0) rotateY(0) translateY(-9px);
+            box-shadow: 28px 34px 70px rgba(0, 0, 0, 0.62), 0 0 65px rgba(108, 180, 44, 0.2);
+        }
+
+        @keyframes login-card-float {
+            0%, 100% { translate: 0 0; }
+            50% { translate: 0 -8px; }
+        }
+
+        #loginOverlay .login-card h2 {
+            color: #a7e36c !important;
+            letter-spacing: 0.16em;
+            text-shadow: 0 0 22px rgba(108, 180, 44, 0.28);
+        }
+
+        #loginOverlay .login-card label,
+        #loginOverlay .login-card p {
+            color: rgba(240, 246, 239, 0.88) !important;
+        }
+
+        #loginOverlay .login-card input {
+            background: rgba(3, 9, 5, 0.42);
+            border: 1px solid rgba(255, 255, 255, 0.13);
+            color: white;
+            border-radius: 11px;
+            padding: 0.9rem 1rem;
+            transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+        }
+
+        #loginOverlay .login-card input:focus {
+            border-color: rgba(153, 221, 94, 0.78);
+            background: rgba(3, 9, 5, 0.66);
+            box-shadow: 0 0 0 3px rgba(108, 180, 44, 0.16);
+            outline: none;
+        }
+
+        #loginOverlay .login-card input::placeholder {
+            color: rgba(255, 255, 255, 0.48);
+        }
+
+        #loginOverlay #loginBtn {
+            border-radius: 11px;
+            box-shadow: 0 8px 20px rgba(75, 139, 36, 0.28);
+        }
+
+        #loginOverlay #loginBtn:hover {
+            filter: brightness(1.1);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px rgba(75, 139, 36, 0.38);
+        }
+
+        @media (max-width: 520px) {
+            #loginOverlay { padding: 1rem; }
+            #loginOverlay .login-card {
+                max-height: calc(100vh - 2rem);
+                padding: 2rem 1.4rem 1.6rem;
+                transform: none;
+                animation-duration: 8s;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            #loginOverlay .login-card { animation: none; transition: none; transform: none; }
+        }
+
+        /* Keep compatibility with any legacy login-box markup. */
+        #loginOverlay .login-box {
             width: 100%;
             max-width: 400px;
             padding: 2.5rem;
@@ -1877,25 +2111,7 @@
             text-align: center;
         }
 
-        .login-card h2,
-        .login-card label,
-        .login-card p {
-            color: white !important;
-        }
-
-        .login-card input {
-            background: rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: white;
-            border-radius: 8px;
-            padding: 0.8rem;
-        }
-
-        .login-card input::placeholder {
-            color: rgba(255, 255, 255, 0.5);
-        }
-
-        .error-text {
+        #loginOverlay .error-text {
             color: #ef4444;
             font-size: 0.8rem;
             margin-top: 0.5rem;
@@ -1941,7 +2157,7 @@
             font-size: 0.8rem;
         }
 
-        #loginBtn {
+        #loginOverlay #loginBtn {
             background: #6CB42C !important;
             border: none !important;
             color: white !important;
@@ -1974,7 +2190,7 @@
             display: none !important;
         }
     </style>
-    <script src="script.js?v=20261010-pdf-share"></script>
+    <script src="script.js?v=20261010-about-us"></script>
     <!-- Query Modal -->
     <div id="queryModal" class="modal-overlay hidden">
         <div class="modal-content card" style="max-width: 500px;">

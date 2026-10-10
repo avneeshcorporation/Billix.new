@@ -454,6 +454,7 @@ function setupEventListeners() {
     // Logout Logic
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('billix-auth');
             sessionStorage.removeItem('billix-auth');
             window.location.reload();
         });
@@ -535,6 +536,22 @@ function toggleSidebar() {
 function switchView(view) {
     if (sidebarBtns) {
         sidebarBtns.forEach(b => b.classList.toggle('active', b.getAttribute('data-view') === view));
+    }
+
+    const aboutView = document.getElementById('aboutView');
+    if (view !== 'about' && aboutView) aboutView.classList.add('hidden');
+
+    // The About page is an isolated informational view; existing view flows remain unchanged.
+    if (view === 'about') {
+        [dashboardView, createInvoiceView, homeView, helpView].forEach(existingView => {
+            if (existingView) existingView.classList.add('hidden');
+        });
+        ['profileView', 'pdfDownloadsView', 'ledgerView'].forEach(viewId => {
+            const existingView = document.getElementById(viewId);
+            if (existingView) existingView.classList.add('hidden');
+        });
+        if (aboutView) aboutView.classList.remove('hidden');
+        return;
     }
 
     if (view === 'dashboard') {
@@ -1025,7 +1042,13 @@ function downloadExcel() {
 }
 
 function checkAuth() {
-    const isAuth = sessionStorage.getItem('billix-auth') === 'true';
+    // Migrate existing tab-only sessions so users do not have to sign in again.
+    if (sessionStorage.getItem('billix-auth') === 'true' && localStorage.getItem('billix-auth') !== 'true') {
+        localStorage.setItem('billix-auth', 'true');
+    }
+    sessionStorage.removeItem('billix-auth');
+
+    const isAuth = localStorage.getItem('billix-auth') === 'true';
     if (isAuth) {
         loginOverlay.classList.add('hidden');
         switchView('home');
@@ -1051,9 +1074,10 @@ function handleLogin() {
     // Hardcoded Credentials - Case insensitive for User ID
     if (userId.toLowerCase() === 'avneesh.co' && password === 'Avneesh@2026') {
         try {
-            sessionStorage.setItem('billix-auth', 'true');
+            localStorage.setItem('billix-auth', 'true');
+            sessionStorage.removeItem('billix-auth');
         } catch (e) {
-            console.error("Session storage blocked:", e);
+            console.error("Persistent login storage blocked:", e);
         }
 
         if (overlayEl) {
