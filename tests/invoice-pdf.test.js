@@ -158,11 +158,11 @@ test('browser print rules scope output to the invoice and allow table pagination
     assert.match(styleSource, /body\.printing-invoice #invoicePreview tr[\s\S]*?break-inside:\s*avoid/);
 });
 
-test('download dropdown closes reliably and each menu action queues once per click', () => {
+test('download dropdown generates each selected copy, blocks overlaps, and works repeatedly', async () => {
     const handlers = new Map();
     const windowHandlers = new Map();
-    const timers = [];
-    const queuedTypes = [];
+    const generatedTypes = [];
+    let finishGeneration;
     const options = [
         'ORIGINAL FOR RECIPIENT',
         'DUPLICATE FOR TRANSPORTER',
@@ -191,14 +191,17 @@ test('download dropdown closes reliably and each menu action queues once per cli
     };
     const window = {
         addEventListener: (name, handler) => windowHandlers.set(name, handler),
-        setTimeout: callback => { timers.push(callback); return timers.length; }
     };
     const sandbox = {
         downloadBtn: button,
         dropdownItems: options,
         window,
-        requestPDFDownload: type => { queuedTypes.push(type); },
-        isRaisingPDFRequest: false
+        generatePDF: type => {
+            generatedTypes.push(type);
+            return new Promise(resolve => { finishGeneration = resolve; });
+        },
+        console: { error() {} },
+        isGeneratingInvoicePDF: false
     };
     vm.runInNewContext(`function bindDropdown() { ${dropdownSource} }\nglobalThis.runBindDropdown = bindDropdown;`, sandbox);
     sandbox.runBindDropdown();
@@ -212,16 +215,21 @@ test('download dropdown closes reliably and each menu action queues once per cli
     assert.equal(dropdown.open, false);
 
     for (const type of ['ORIGINAL FOR RECIPIENT', 'DUPLICATE FOR TRANSPORTER', 'SUPPLIER COPY', 'ALL']) {
-        toggleHandler(stopEvent);
         const itemHandler = handlers.get(`${type}:click`);
-        itemHandler();
-        itemHandler();
-        windowHandlers.get('click')({ target: options.find(option => option.getAttribute() === type) });
-        assert.equal(queuedTypes.filter(queuedType => queuedType === type).length, 1);
-        assert.equal(dropdown.open, false);
-        assert.equal(button.disabled, true);
-        timers.shift()();
-        assert.equal(button.disabled, false);
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+            toggleHandler(stopEvent);
+            const generation = itemHandler();
+            assert.equal(dropdown.open, false);
+            assert.equal(button.disabled, true);
+            assert.equal(options.every(option => option.disabled), true);
+            await itemHandler();
+            assert.equal(generatedTypes.filter(value => value === type).length, attempt + 1,
+                'overlapping selections should be ignored');
+            finishGeneration();
+            await generation;
+            assert.equal(button.disabled, false);
+            assert.equal(options.every(option => option.disabled), false);
+        }
     }
 
     toggleHandler(stopEvent);

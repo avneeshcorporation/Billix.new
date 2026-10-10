@@ -10,7 +10,7 @@ let homeView, helpView, queryListContainer, queryModal, btnOpenQueryForm, closeQ
 
 let activeEditor = null;
 let invoiceDateEditedByUser = false;
-let isRaisingPDFRequest = false;
+let isGeneratingInvoicePDF = false;
 let isDownloadingPDFRequest = false;
 
 function getLocalDateInputValue(date = new Date()) {
@@ -389,23 +389,25 @@ function setupEventListeners() {
             setDropdownOpen(!dropdown?.classList.contains('open'));
         });
 
-        // Dropdown item selection (Raises PDF Download Request for selected option)
+        // Generate the selected invoice copy directly from the current invoice preview.
         dropdownItems.forEach(item => {
-            item.addEventListener('click', () => {
+            item.addEventListener('click', async () => {
                 const copyType = item.getAttribute('data-copy');
-                if (isRaisingPDFRequest) return;
-                isRaisingPDFRequest = true;
+                if (isGeneratingInvoicePDF) return;
+                isGeneratingInvoicePDF = true;
                 downloadBtn.disabled = true;
                 dropdownItems.forEach(option => { option.disabled = true; });
+                setDropdownOpen(false);
                 try {
-                    requestPDFDownload(copyType);
+                    await generatePDF(copyType);
+                } catch (error) {
+                    // generatePDF reports generation errors to the user; keep this
+                    // handler's rejection contained so the dropdown remains usable.
+                    console.error('Invoice PDF download failed:', error);
                 } finally {
-                    setDropdownOpen(false);
-                    window.setTimeout(() => {
-                        isRaisingPDFRequest = false;
-                        downloadBtn.disabled = false;
-                        dropdownItems.forEach(option => { option.disabled = false; });
-                    }, 350);
+                    isGeneratingInvoicePDF = false;
+                    downloadBtn.disabled = false;
+                    dropdownItems.forEach(option => { option.disabled = false; });
                 }
             });
         });
@@ -1409,9 +1411,13 @@ async function generatePDF(copyType, { returnBlob = false } = {}) {
 
     const invoicePreview = document.getElementById('invoicePreview');
     if (!invoicePreview) {
+        showToast('Invoice preview not found.', '❌');
         throw new Error('Invoice preview not found.');
     }
-    if (typeof html2pdf !== 'function') throw new Error('PDF generator is not available. Refresh the page and try again.');
+    if (typeof html2pdf !== 'function') {
+        showToast('PDF generator is not available. Refresh the page and try again.', '❌');
+        throw new Error('PDF generator is not available. Refresh the page and try again.');
+    }
 
     // A saved invoice restore can sync blank Ship To form fields over the
     // checked Same as Bill To preview. Reapply that setting before cloning the
