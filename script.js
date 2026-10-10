@@ -1482,7 +1482,9 @@ async function generatePDF(copyType, { returnBlob = false } = {}) {
         pageWrapper.className = 'pdf-page'; // Use class for CSS-based breaks
         pageWrapper.style.cssText = `
             width: 210mm; 
-            min-height: 297mm;
+            /* Leave a small tolerance below A4 to prevent html2pdf's pixel rounding
+               from spilling an otherwise single-page copy onto a blank page. */
+            min-height: 296mm;
             overflow: visible;
             padding: 8mm;
             margin: 0 auto; 
@@ -1534,8 +1536,8 @@ async function generatePDF(copyType, { returnBlob = false } = {}) {
                     print-color-adjust: exact !important;
                 }
                 #pdf-render-target { width: 210mm; margin: 0 auto; }
-                .pdf-page { break-after: page; page-break-after: always; break-inside: auto; }
-                .pdf-page:last-child { break-after: auto; page-break-after: auto; }
+                .pdf-page { break-inside: auto; page-break-inside: auto; }
+                .pdf-page + .pdf-page { break-before: page; page-break-before: always; }
                 .pdf-page table { page-break-inside: auto; break-inside: auto; }
                 .pdf-page tr { page-break-inside: avoid; break-inside: avoid; }
                 .invoice-footer { margin-top: 5mm !important; margin-bottom: 0 !important; }

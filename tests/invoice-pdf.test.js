@@ -125,7 +125,10 @@ test('each individual copy keeps its label and gets an uncut, flowing PDF page',
         assert.ok(blob.size > 0);
         assert.match(harness.writtenDocuments[0], new RegExp(`\\(${copyType}\\)`));
         assert.match(harness.writtenDocuments[0], /overflow: visible/);
-        assert.doesNotMatch(harness.writtenDocuments[0], /height: 296\.8mm|overflow: hidden/);
+        assert.match(harness.writtenDocuments[0], /min-height:\s*296mm/);
+        assert.doesNotMatch(harness.writtenDocuments[0], /min-height:\s*297mm|overflow: hidden/);
+        assert.match(harness.writtenDocuments[0], /\.pdf-page \+ \.pdf-page\s*\{\s*break-before:\s*page;\s*page-break-before:\s*always;/);
+        assert.doesNotMatch(harness.writtenDocuments[0], /\.pdf-page\s*\{[^}]*page-break-after:\s*always/);
         assert.deepEqual(Array.from(harness.generatedOptions[0].pagebreak.avoid), ['tr']);
         assert.equal(harness.generatedOptions[0].filename, 'Invoice_AC_26-27_07.pdf');
         assert.equal(harness.getIframeCount(), 1);
