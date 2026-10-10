@@ -25,6 +25,10 @@ const downloadRequestHandlerStart = scriptSource.indexOf('window.downloadRequest
 const renderRequestsEnd = scriptSource.lastIndexOf('/**', downloadRequestHandlerStart);
 assert.ok(renderRequestsStart >= 0 && renderRequestsEnd > renderRequestsStart, 'PDF Downloads renderer should be present');
 const renderRequestsSource = scriptSource.slice(renderRequestsStart, renderRequestsEnd);
+const locationDividerStart = scriptSource.indexOf('function syncInvoiceLocationDivider(');
+const syncAllStart = scriptSource.indexOf('function syncAllToPreview(', locationDividerStart);
+assert.ok(locationDividerStart >= 0 && syncAllStart > locationDividerStart, 'Pune divider color handler should be present');
+const locationDividerSource = scriptSource.slice(locationDividerStart, syncAllStart);
 
 function createPDFHarness({ generatorAvailable = true, failGeneration = false } = {}) {
     const writtenDocuments = [];
@@ -214,6 +218,35 @@ test('selected invoice copies appear in PDF Downloads with their own download ac
     assert.match(list.innerHTML, /INV-42/);
     assert.match(list.innerHTML, /Supplier Copy/);
     assert.match(list.innerHTML, /downloadRequestedPDF\('/);
+});
+
+test('only the invoice-details divider switches between Pune orange and the default blue', () => {
+    const dividerChanges = [];
+    const location = { value: 'pune' };
+    const divider = {
+        style: {
+            setProperty(property, value, priority) {
+                dividerChanges.push({ property, value, priority });
+            }
+        }
+    };
+    const sandbox = {
+        document: {
+            getElementById: id => id === 'invoiceLocation' ? location : id === 'invoiceDetailsDivider' ? divider : null
+        }
+    };
+    vm.runInNewContext(`${locationDividerSource}\nglobalThis.runSyncInvoiceLocationDivider = syncInvoiceLocationDivider;`, sandbox);
+
+    sandbox.runSyncInvoiceLocationDivider();
+    location.value = 'indore';
+    sandbox.runSyncInvoiceLocationDivider();
+
+    assert.deepEqual(dividerChanges, [
+        { property: 'border-bottom-color', value: '#D04E2A', priority: 'important' },
+        { property: 'border-bottom-color', value: '#1e40af', priority: 'important' }
+    ]);
+    assert.match(scriptSource, /invoiceLocationSelector\?\.addEventListener\('change', syncInvoiceLocationDivider\)/);
+    assert.match(scriptSource, /syncBillToToShipToPreview\(\);\s*syncInvoiceLocationDivider\(\);/);
 });
 
 test('download dropdown queues each selected copy, blocks rapid duplicates, and works repeatedly', () => {

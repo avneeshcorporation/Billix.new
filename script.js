@@ -426,6 +426,9 @@ function setupEventListeners() {
     }
 
     // State Selector Logic
+    const invoiceLocationSelector = document.getElementById('invoiceLocation');
+    invoiceLocationSelector?.addEventListener('change', syncInvoiceLocationDivider);
+
     const stateSelectors = document.querySelectorAll('.state-selector');
     stateSelectors.forEach(select => {
         select.addEventListener('change', (e) => {
@@ -1172,6 +1175,15 @@ function syncBillToToShipToPreview() {
     }
 }
 
+function syncInvoiceLocationDivider() {
+    const invoiceLocation = document.getElementById('invoiceLocation');
+    const divider = document.getElementById('invoiceDetailsDivider');
+    if (!divider) return;
+
+    const color = invoiceLocation?.value === 'pune' ? '#D04E2A' : '#1e40af';
+    divider.style.setProperty('border-bottom-color', color, 'important');
+}
+
 function syncAllToPreview() {
     const inputs = invoiceForm.querySelectorAll('[data-sync]');
     inputs.forEach(input => {
@@ -1181,6 +1193,7 @@ function syncAllToPreview() {
         updatePreviewText(input.getAttribute('data-sync'), val, isRich);
     });
     syncBillToToShipToPreview();
+    syncInvoiceLocationDivider();
 }
 
 function formatDate(date) {
