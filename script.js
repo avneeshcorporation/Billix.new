@@ -10,7 +10,7 @@ let homeView, helpView, queryListContainer, queryModal, btnOpenQueryForm, closeQ
 
 let activeEditor = null;
 let invoiceDateEditedByUser = false;
-let isGeneratingInvoicePDF = false;
+let isRaisingPDFRequest = false;
 let isDownloadingPDFRequest = false;
 
 function getLocalDateInputValue(date = new Date()) {
@@ -389,25 +389,26 @@ function setupEventListeners() {
             setDropdownOpen(!dropdown?.classList.contains('open'));
         });
 
-        // Generate the selected invoice copy directly from the current invoice preview.
+        // Selecting a copy adds it to PDF Downloads; generation stays on that page.
         dropdownItems.forEach(item => {
-            item.addEventListener('click', async () => {
+            item.addEventListener('click', () => {
                 const copyType = item.getAttribute('data-copy');
-                if (isGeneratingInvoicePDF) return;
-                isGeneratingInvoicePDF = true;
+                if (isRaisingPDFRequest) return;
+                isRaisingPDFRequest = true;
                 downloadBtn.disabled = true;
                 dropdownItems.forEach(option => { option.disabled = true; });
                 setDropdownOpen(false);
                 try {
-                    await generatePDF(copyType);
+                    requestPDFDownload(copyType);
                 } catch (error) {
-                    // generatePDF reports generation errors to the user; keep this
-                    // handler's rejection contained so the dropdown remains usable.
-                    console.error('Invoice PDF download failed:', error);
+                    console.error('Unable to raise invoice PDF request:', error);
+                    showToast('Could not save the PDF request. Please try again.', '❌');
                 } finally {
-                    isGeneratingInvoicePDF = false;
-                    downloadBtn.disabled = false;
-                    dropdownItems.forEach(option => { option.disabled = false; });
+                    window.setTimeout(() => {
+                        isRaisingPDFRequest = false;
+                        downloadBtn.disabled = false;
+                        dropdownItems.forEach(option => { option.disabled = false; });
+                    }, 350);
                 }
             });
         });

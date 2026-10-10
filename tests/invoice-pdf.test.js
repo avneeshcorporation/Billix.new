@@ -16,6 +16,15 @@ const dropdownStart = scriptSource.indexOf('    // Dropdown Toggle', setupStart)
 const dropdownEnd = scriptSource.indexOf('    // State Selector Logic', dropdownStart);
 assert.ok(dropdownStart >= 0 && dropdownEnd > dropdownStart, 'invoice download dropdown handlers should be present');
 const dropdownSource = scriptSource.slice(dropdownStart, dropdownEnd);
+const requestStart = scriptSource.indexOf('function requestPDFDownload(');
+const renderRequestsStart = scriptSource.indexOf('function renderPDFDownloadsView(', requestStart);
+const requestEnd = scriptSource.lastIndexOf('/**', renderRequestsStart);
+assert.ok(requestStart >= 0 && requestEnd > requestStart, 'PDF request capture function should be present');
+const requestSource = scriptSource.slice(requestStart, requestEnd);
+const downloadRequestHandlerStart = scriptSource.indexOf('window.downloadRequestedPDF', renderRequestsStart);
+const renderRequestsEnd = scriptSource.lastIndexOf('/**', downloadRequestHandlerStart);
+assert.ok(renderRequestsStart >= 0 && renderRequestsEnd > renderRequestsStart, 'PDF Downloads renderer should be present');
+const renderRequestsSource = scriptSource.slice(renderRequestsStart, renderRequestsEnd);
 
 function createPDFHarness({ generatorAvailable = true, failGeneration = false } = {}) {
     const writtenDocuments = [];
@@ -158,11 +167,60 @@ test('browser print rules scope output to the invoice and allow table pagination
     assert.match(styleSource, /body\.printing-invoice #invoicePreview tr[\s\S]*?break-inside:\s*avoid/);
 });
 
-test('download dropdown generates each selected copy, blocks overlaps, and works repeatedly', async () => {
+test('download dropdown is layered above the invoice preview', () => {
+    const headerRule = styleSource.match(/\n\.app-header\s*\{([^}]*)\}/);
+    const menuRule = styleSource.match(/\n\.dropdown-menu\s*\{([^}]*)\}/);
+    assert.ok(headerRule, 'app header styles should be present');
+    assert.match(headerRule[1], /position:\s*relative/);
+    assert.match(headerRule[1], /z-index:\s*20/);
+    assert.ok(menuRule, 'download menu styles should be present');
+    assert.match(menuRule[1], /z-index:\s*100/);
+});
+
+test('selected invoice copies appear in PDF Downloads with their own download action', () => {
+    const storage = new Map();
+    const localStorage = {
+        getItem: key => storage.get(key) ?? null,
+        setItem: (key, value) => storage.set(key, value)
+    };
+    const requestSandbox = {
+        PDF_REQUESTS_KEY: 'billix-pdf-requests',
+        invoiceForm: { querySelectorAll: () => [] },
+        productBody: { children: [] },
+        document: { getElementById: () => null },
+        localStorage,
+        getFieldVal: id => ({ invoiceNo: 'INV-42', buyerName: 'Test Buyer' })[id] || '',
+        captureFormFieldValue: () => '',
+        showToast() {},
+        console: { error() {} }
+    };
+    vm.runInNewContext(`${requestSource}\nglobalThis.runRequestPDFDownload = requestPDFDownload;`, requestSandbox);
+    assert.equal(requestSandbox.runRequestPDFDownload('SUPPLIER COPY'), true);
+
+    const requests = JSON.parse(storage.get('billix-pdf-requests'));
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].invNo, 'INV-42');
+    assert.equal(requests[0].copyType, 'SUPPLIER COPY');
+    assert.equal(requests[0].status, 'Pending');
+
+    const list = { innerHTML: '' };
+    const renderSandbox = {
+        PDF_REQUESTS_KEY: 'billix-pdf-requests',
+        localStorage,
+        document: { getElementById: id => id === 'pdfRequestsList' ? list : null }
+    };
+    vm.runInNewContext(`${renderRequestsSource}\nglobalThis.runRenderPDFDownloadsView = renderPDFDownloadsView;`, renderSandbox);
+    renderSandbox.runRenderPDFDownloadsView();
+    assert.match(list.innerHTML, /INV-42/);
+    assert.match(list.innerHTML, /Supplier Copy/);
+    assert.match(list.innerHTML, /downloadRequestedPDF\('/);
+});
+
+test('download dropdown queues each selected copy, blocks rapid duplicates, and works repeatedly', () => {
     const handlers = new Map();
     const windowHandlers = new Map();
-    const generatedTypes = [];
-    let finishGeneration;
+    const timers = [];
+    const queuedTypes = [];
     const options = [
         'ORIGINAL FOR RECIPIENT',
         'DUPLICATE FOR TRANSPORTER',
@@ -191,17 +249,16 @@ test('download dropdown generates each selected copy, blocks overlaps, and works
     };
     const window = {
         addEventListener: (name, handler) => windowHandlers.set(name, handler),
+        setTimeout: callback => { timers.push(callback); return timers.length; }
     };
     const sandbox = {
         downloadBtn: button,
         dropdownItems: options,
         window,
-        generatePDF: type => {
-            generatedTypes.push(type);
-            return new Promise(resolve => { finishGeneration = resolve; });
-        },
+        requestPDFDownload: type => { queuedTypes.push(type); return true; },
         console: { error() {} },
-        isGeneratingInvoicePDF: false
+        showToast() {},
+        isRaisingPDFRequest: false
     };
     vm.runInNewContext(`function bindDropdown() { ${dropdownSource} }\nglobalThis.runBindDropdown = bindDropdown;`, sandbox);
     sandbox.runBindDropdown();
@@ -218,15 +275,14 @@ test('download dropdown generates each selected copy, blocks overlaps, and works
         const itemHandler = handlers.get(`${type}:click`);
         for (let attempt = 0; attempt < 2; attempt += 1) {
             toggleHandler(stopEvent);
-            const generation = itemHandler();
+            itemHandler();
             assert.equal(dropdown.open, false);
             assert.equal(button.disabled, true);
             assert.equal(options.every(option => option.disabled), true);
-            await itemHandler();
-            assert.equal(generatedTypes.filter(value => value === type).length, attempt + 1,
-                'overlapping selections should be ignored');
-            finishGeneration();
-            await generation;
+            itemHandler();
+            assert.equal(queuedTypes.filter(value => value === type).length, attempt + 1,
+                'rapid duplicate selections should be ignored');
+            timers.shift()();
             assert.equal(button.disabled, false);
             assert.equal(options.every(option => option.disabled), false);
         }
