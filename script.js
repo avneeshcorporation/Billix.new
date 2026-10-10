@@ -92,6 +92,17 @@ function getFieldVal(id) {
     return el.value || '';
 }
 
+function captureFormFieldValue(el) {
+    if (el.type === 'checkbox') return el.checked;
+    return el.classList.contains('rich-editable') ? el.innerHTML : el.value;
+}
+
+function restoreFormFieldValue(el, value) {
+    if (el.type === 'checkbox') el.checked = Boolean(value);
+    else if (el.classList.contains('rich-editable')) el.innerHTML = value ?? '';
+    else el.value = value ?? '';
+}
+
 // Initialize
 function initApp() {
     try {
@@ -280,22 +291,7 @@ function setupEventListeners() {
         sameAsBillTo.addEventListener('change', (e) => {
             if (e.target.checked) {
                 if (shipToFields) shipToFields.classList.add('hidden');
-                // Sync Ship To with Bill To in preview
-                const previewName = document.getElementById('preview-ship-to-name');
-                const previewAddr = document.getElementById('preview-ship-to-address');
-                const previewGST = document.getElementById('preview-ship-to-gst');
-                const previewState = document.getElementById('preview-ship-to-state');
-                const previewStateName = document.getElementById('preview-ship-to-state-name');
-                if (previewName) previewName.textContent = getVal('buyerName');
-                if (previewAddr) previewAddr.textContent = getVal('buyerAddress');
-                if (previewGST) previewGST.textContent = getVal('buyerGST');
-                if (previewState) previewState.textContent = getVal('buyerStateCode');
-                if (previewStateName) {
-                    const buyerStateSelect = document.getElementById('buyerState');
-                    if (buyerStateSelect && buyerStateSelect.selectedIndex >= 0) {
-                        previewStateName.textContent = buyerStateSelect.options[buyerStateSelect.selectedIndex].text.toUpperCase();
-                    }
-                }
+                syncBillToToShipToPreview();
             } else {
                 if (shipToFields) shipToFields.classList.remove('hidden');
             }
@@ -346,10 +342,8 @@ function setupEventListeners() {
                 if (e.target.type === 'date') val = formatDate(new Date(val));
                 updatePreviewText(syncKey, val, isRich);
 
-                // If Ship To is synced with Bill To
                 if (sameAsBillTo && sameAsBillTo.checked && syncKey.startsWith('bill-to-')) {
-                    const shipKey = syncKey.replace('bill-to-', 'ship-to-');
-                    updatePreviewText(shipKey, val, isRich);
+                    syncBillToToShipToPreview();
                 }
             }
 
@@ -405,7 +399,7 @@ function setupEventListeners() {
                 const syncKey = targetInput.getAttribute('data-sync');
                 if (syncKey) {
                     const nameId = `preview-${syncKey}-name`;
-                    const nameEl = document.getElementById(nameId);
+                    const nameEl = document.getElementById('invoicePreview')?.querySelector(`#${nameId}`);
                     if (nameEl) {
                         nameEl.textContent = select.options[select.selectedIndex].text.toUpperCase();
                     }
@@ -413,10 +407,7 @@ function setupEventListeners() {
                     // If 'Same as Bill To' is checked and this is the buyer state, sync to ship-to preview as well
                     const sameAsBillTo = document.getElementById('sameAsBillTo');
                     if (sameAsBillTo && sameAsBillTo.checked && syncKey === 'bill-to-state') {
-                        const shipToNameEl = document.getElementById('preview-ship-to-state-name');
-                        const shipToCodeEl = document.getElementById('preview-ship-to-state');
-                        if (shipToNameEl) shipToNameEl.textContent = select.options[select.selectedIndex].text.toUpperCase();
-                        if (shipToCodeEl) shipToCodeEl.textContent = select.value;
+                        syncBillToToShipToPreview();
                     }
                 }
             }
@@ -1104,13 +1095,36 @@ function handleLogin() {
 }
 
 function updatePreviewText(key, value, isRich = false) {
-    const el = document.getElementById(`preview-${key}`) || document.getElementById(`p-${key}`);
+    const preview = document.getElementById('invoicePreview');
+    const el = preview?.querySelector(`#preview-${key}`) || preview?.querySelector(`#p-${key}`);
     if (el) {
         if (isRich) {
             el.innerHTML = value || '';
         } else {
             el.textContent = value || '';
         }
+    }
+}
+
+function syncBillToToShipToPreview() {
+    if (!sameAsBillTo?.checked) return;
+    const billToShipFields = [
+        ['buyerName', 'preview-ship-to-name'],
+        ['buyerAddress', 'preview-ship-to-address'],
+        ['buyerGST', 'preview-ship-to-gst'],
+        ['buyerStateCode', 'preview-ship-to-state']
+    ];
+    const preview = document.getElementById('invoicePreview');
+    billToShipFields.forEach(([sourceId, targetId]) => {
+        const source = document.getElementById(sourceId);
+        const target = preview?.querySelector(`#${targetId}`);
+        if (source && target) target.textContent = getFieldVal(sourceId);
+    });
+
+    const selectedState = document.getElementById('buyerState');
+    const stateName = preview?.querySelector('#preview-ship-to-state-name');
+    if (selectedState && stateName && selectedState.selectedIndex >= 0) {
+        stateName.textContent = selectedState.options[selectedState.selectedIndex].text.toUpperCase();
     }
 }
 
@@ -1122,6 +1136,7 @@ function syncAllToPreview() {
         if (input.type === 'date') val = formatDate(new Date(val));
         updatePreviewText(input.getAttribute('data-sync'), val, isRich);
     });
+    syncBillToToShipToPreview();
 }
 
 function formatDate(date) {
@@ -1537,7 +1552,7 @@ async function saveToHistory(copyType) {
     const inputs = invoiceForm.querySelectorAll('input, select, .rich-editable');
     inputs.forEach(el => {
         if (el.id) {
-            state.form[el.id] = el.classList.contains('rich-editable') ? el.innerHTML : el.value;
+            state.form[el.id] = captureFormFieldValue(el);
         }
     });
 
@@ -1622,7 +1637,7 @@ function saveCurrentStateAsLatest(copyType) {
     const inputs = invoiceForm.querySelectorAll('input, select, .rich-editable');
     inputs.forEach(el => {
         if (el.id) {
-            state.form[el.id] = el.classList.contains('rich-editable') ? el.innerHTML : el.value;
+            state.form[el.id] = captureFormFieldValue(el);
         }
     });
 
@@ -1665,7 +1680,7 @@ async function downloadLatestSavedInvoice(state, { returnBlob = false } = {}) {
     const inputs = invoiceForm.querySelectorAll('input, select, .rich-editable');
     inputs.forEach(el => {
         if (el.id) {
-            backup.form[el.id] = el.classList.contains('rich-editable') ? el.innerHTML : el.value;
+            backup.form[el.id] = captureFormFieldValue(el);
         }
     });
 
@@ -1676,9 +1691,9 @@ async function downloadLatestSavedInvoice(state, { returnBlob = false } = {}) {
         for (const [id, val] of Object.entries(state.form || {})) {
             const el = document.getElementById(id);
             if (!el) continue;
-            if (el.classList.contains('rich-editable')) el.innerHTML = val ?? '';
-            else el.value = val ?? '';
+            restoreFormFieldValue(el, val);
         }
+        sameAsBillTo?.dispatchEvent(new Event('change', { bubbles: true }));
 
         // Recreate the product rows using the same element type-aware mapping
         // used by capture, so rich-editable descriptions and HSN codes survive.
@@ -1709,9 +1724,9 @@ async function downloadLatestSavedInvoice(state, { returnBlob = false } = {}) {
         for (const [id, val] of Object.entries(backup.form)) {
             const el = document.getElementById(id);
             if (!el) continue;
-            if (el.classList.contains('rich-editable')) el.innerHTML = val ?? '';
-            else el.value = val ?? '';
+            restoreFormFieldValue(el, val);
         }
+        sameAsBillTo?.dispatchEvent(new Event('change', { bubbles: true }));
 
         productBody.innerHTML = '';
         backup.products.forEach(p => {
@@ -2030,7 +2045,7 @@ function requestPDFDownload(requestedCopyType) {
     const inputs = invoiceForm.querySelectorAll('input, select, .rich-editable');
     inputs.forEach(el => {
         if (el.id) {
-            state.form[el.id] = el.classList.contains('rich-editable') ? el.innerHTML : el.value;
+            state.form[el.id] = captureFormFieldValue(el);
         }
     });
 
