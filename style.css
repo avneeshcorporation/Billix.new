@@ -1335,6 +1335,7 @@ body.dark-mode .login-overlay {
         height: auto;
         padding: 0.5rem;
         position: static;
+        align-items: flex-start;
     }
 
     .invoice-container {

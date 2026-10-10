@@ -26,6 +26,61 @@ function setInvoiceDateDefault(forceToday = false) {
     updatePreviewText('invoice-date', formatDate(new Date(`${dateInput.value}T00:00:00`)));
 }
 
+let invoicePreviewFitFrame = null;
+
+function fitInvoicePreviewToViewport() {
+    const previewPane = document.querySelector('.preview-pane');
+    const invoicePreview = document.getElementById('invoicePreview');
+    if (!previewPane || !invoicePreview || !invoicePreview.offsetWidth) return;
+
+    if (window.innerWidth > 1024) {
+        ['transform', 'transform-origin', 'min-width', 'width', 'margin-left', 'margin-bottom'].forEach(property => {
+            invoicePreview.style.removeProperty(property);
+        });
+        return;
+    }
+
+    invoicePreview.style.minWidth = '0';
+    invoicePreview.style.width = '210mm';
+
+    const paneStyle = window.getComputedStyle(previewPane);
+    const availableWidth = previewPane.clientWidth -
+        parseFloat(paneStyle.paddingLeft) - parseFloat(paneStyle.paddingRight);
+    const naturalWidth = invoicePreview.offsetWidth;
+    const naturalHeight = invoicePreview.offsetHeight;
+    const scale = Math.min(1, availableWidth / naturalWidth);
+
+    invoicePreview.style.transformOrigin = 'top left';
+    invoicePreview.style.transform = `scale(${scale})`;
+    invoicePreview.style.marginLeft = `${Math.max(0, (availableWidth - naturalWidth * scale) / 2)}px`;
+    invoicePreview.style.marginBottom = `${-naturalHeight * (1 - scale)}px`;
+}
+
+function scheduleInvoicePreviewFit() {
+    if (invoicePreviewFitFrame !== null) cancelAnimationFrame(invoicePreviewFitFrame);
+    invoicePreviewFitFrame = requestAnimationFrame(() => {
+        invoicePreviewFitFrame = null;
+        fitInvoicePreviewToViewport();
+    });
+}
+
+function setupInvoicePreviewFit() {
+    const previewPane = document.querySelector('.preview-pane');
+    const invoicePreview = document.getElementById('invoicePreview');
+    if (!previewPane || !invoicePreview) return;
+
+    window.addEventListener('resize', scheduleInvoicePreviewFit);
+    if (typeof ResizeObserver !== 'undefined') {
+        const resizeObserver = new ResizeObserver(scheduleInvoicePreviewFit);
+        resizeObserver.observe(previewPane);
+        resizeObserver.observe(invoicePreview);
+    }
+
+    const contentObserver = new MutationObserver(scheduleInvoicePreviewFit);
+    contentObserver.observe(invoicePreview, { childList: true, characterData: true, subtree: true });
+    scheduleInvoicePreviewFit();
+}
+
 // Utility to get value from either input or rich-editable div
 function getFieldVal(id) {
     const el = document.getElementById(id);
@@ -101,6 +156,7 @@ function initApp() {
 
         // Setup event listeners
         setupEventListeners();
+        setupInvoicePreviewFit();
 
         // Initial sync of all default values
         syncAllToPreview();
@@ -546,6 +602,7 @@ function switchView(view) {
         setInvoiceDateDefault();
         dashboardView.classList.add('hidden');
         createInvoiceView.classList.remove('hidden');
+        scheduleInvoicePreviewFit();
         if (homeView) homeView.classList.add('hidden');
         if (helpView) helpView.classList.add('hidden');
         const profileView = document.getElementById('profileView');
@@ -1339,6 +1396,8 @@ async function generatePDF(copyType) {
             box-shadow: none !important;
             border: none !important;
             width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
             margin: 0 !important;
             display: block !important;
             visibility: visible !important;
