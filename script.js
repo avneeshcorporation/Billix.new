@@ -1783,7 +1783,9 @@ async function downloadLatestSavedInvoice(state, { returnBlob = false } = {}) {
             row.querySelector('.product-rate-unit').value = p.rateUnit || 'Per KGS';
         });
 
-        // Trigger sync and generation after the DOM has the saved values.
+        // Each addNewRow() refreshes before its saved values are applied, so
+        // refresh once after restoring all product data before generating.
+        updatePreviewTable();
         syncAllToPreview();
         calculateTotals();
         generatedBlob = await generatePDF(state.copyType, { returnBlob });
@@ -1814,6 +1816,8 @@ async function downloadLatestSavedInvoice(state, { returnBlob = false } = {}) {
             row.querySelector('.product-rate-unit').value = p.rateUnit || 'Per KGS';
         });
 
+        // Rebuild the visible preview from the user's restored product rows.
+        updatePreviewTable();
         syncAllToPreview();
         calculateTotals();
     }

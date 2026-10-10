@@ -11,6 +11,10 @@ const functionStart = scriptSource.indexOf('async function generatePDF(');
 const functionEnd = scriptSource.indexOf('async function saveToHistory', functionStart);
 assert.ok(functionStart >= 0 && functionEnd > functionStart, 'generatePDF function should be present');
 const generatePDFSource = scriptSource.slice(functionStart, functionEnd);
+const savedInvoiceStart = scriptSource.indexOf('async function downloadLatestSavedInvoice(');
+const savedInvoiceEnd = scriptSource.indexOf('// Automatic Image Slider Logic', savedInvoiceStart);
+assert.ok(savedInvoiceStart >= 0 && savedInvoiceEnd > savedInvoiceStart, 'saved invoice download function should be present');
+const savedInvoiceSource = scriptSource.slice(savedInvoiceStart, savedInvoiceEnd);
 const setupStart = scriptSource.indexOf('function setupEventListeners()');
 const dropdownStart = scriptSource.indexOf('    // Dropdown Toggle', setupStart);
 const dropdownEnd = scriptSource.indexOf('    // State Selector Logic', dropdownStart);
@@ -162,6 +166,20 @@ test('failed PDF rendering is reported and removes its temporary iframe', async 
         /mock PDF render failure/
     );
     assert.equal(harness.getActiveIframes(), 0);
+});
+
+test('saved invoice product descriptions refresh before PDF generation and after form restoration', () => {
+    const lastProductValueAssignment = "row.querySelector('.product-rate-unit').value = p.rateUnit || 'Per KGS';";
+    const assignmentIndexes = [...savedInvoiceSource.matchAll(new RegExp(lastProductValueAssignment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))]
+        .map(match => match.index);
+    assert.equal(assignmentIndexes.length, 2, 'saved and current product rows should each be restored');
+
+    for (const assignmentIndex of assignmentIndexes) {
+        const previewRefreshIndex = savedInvoiceSource.indexOf('updatePreviewTable();', assignmentIndex);
+        const previewSyncIndex = savedInvoiceSource.indexOf('syncAllToPreview();', assignmentIndex);
+        assert.ok(previewRefreshIndex > assignmentIndex, 'product preview should refresh after restored product values');
+        assert.ok(previewSyncIndex > previewRefreshIndex, 'preview fields should sync after product rows refresh');
+    }
 });
 
 test('browser print rules scope output to the invoice and allow table pagination', () => {
