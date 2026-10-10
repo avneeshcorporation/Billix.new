@@ -9,6 +9,22 @@ let dashboardFilters, resetFiltersBtn, sidebar, sidebarToggle, btnDownloadExcel;
 let homeView, helpView, queryListContainer, queryModal, btnOpenQueryForm, closeQueryModal, btnCancelQuery, btnSubmitQuery, queryText, successToast, toastMessage;
 
 let activeEditor = null;
+let invoiceDateEditedByUser = false;
+
+function getLocalDateInputValue(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function setInvoiceDateDefault(forceToday = false) {
+    const dateInput = document.getElementById('invoiceDate');
+    if (!dateInput || (!forceToday && (invoiceDateEditedByUser || dateInput.value === getLocalDateInputValue()))) return;
+
+    dateInput.value = getLocalDateInputValue();
+    updatePreviewText('invoice-date', formatDate(new Date(`${dateInput.value}T00:00:00`)));
+}
 
 // Utility to get value from either input or rich-editable div
 function getFieldVal(id) {
@@ -78,13 +94,10 @@ function initApp() {
         // Add 1 default row
         if (productBody && productBody.children.length === 0) addNewRow();
 
-        // Set default date
-        const dateInput = document.getElementById('invoiceDate');
-        if (dateInput && !dateInput.value) {
-            const today = new Date();
-            dateInput.value = today.toISOString().split('T')[0];
-            updatePreviewText('invoice-date', formatDate(today));
-        }
+        // Default to today's local date while allowing the user to change it.
+        // Override browser-restored form values on a fresh page load. The user
+        // can still edit the date after initialization.
+        setInvoiceDateDefault(true);
 
         // Setup event listeners
         setupEventListeners();
@@ -268,6 +281,7 @@ function setupEventListeners() {
     // Live Sync & Calculations
     if (invoiceForm) {
         invoiceForm.addEventListener('input', (e) => {
+            if (e.target.id === 'invoiceDate') invoiceDateEditedByUser = true;
             const syncKey = e.target.getAttribute('data-sync');
 
             if (syncKey) {
@@ -289,6 +303,9 @@ function setupEventListeners() {
                 if (row) calculateRow(row);
                 calculateTotals();
             }
+        });
+        invoiceForm.addEventListener('change', (e) => {
+            if (e.target.id === 'invoiceDate') invoiceDateEditedByUser = true;
         });
     }
 
@@ -526,6 +543,7 @@ function switchView(view) {
             initLedgerModule();
         }
     } else {
+        setInvoiceDateDefault();
         dashboardView.classList.add('hidden');
         createInvoiceView.classList.remove('hidden');
         if (homeView) homeView.classList.add('hidden');
