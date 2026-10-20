@@ -446,10 +446,9 @@ function setupEventListeners() {
                 const syncKey = targetInput.getAttribute('data-sync');
                 if (syncKey) {
                     const nameId = `preview-${syncKey}-name`;
-                    const nameEl = document.getElementById('invoicePreview')?.querySelector(`#${nameId}`);
-                    if (nameEl) {
-                        nameEl.textContent = select.options[select.selectedIndex].text.toUpperCase();
-                    }
+                    const nameEls = document.getElementById('invoicePreview')?.querySelectorAll(`#${nameId}`) || [];
+                    const stateName = select.options[select.selectedIndex].text.toUpperCase();
+                    nameEls.forEach(nameEl => { nameEl.textContent = stateName; });
 
                     // If 'Same as Bill To' is checked and this is the buyer state, sync to ship-to preview as well
                     const sameAsBillTo = document.getElementById('sameAsBillTo');
@@ -1143,14 +1142,14 @@ function handleLogin() {
 
 function updatePreviewText(key, value, isRich = false) {
     const preview = document.getElementById('invoicePreview');
-    const el = preview?.querySelector(`#preview-${key}`) || preview?.querySelector(`#p-${key}`);
-    if (el) {
+    const elements = preview?.querySelectorAll(`#preview-${key}, #p-${key}`) || [];
+    elements.forEach(el => {
         if (isRich) {
             el.innerHTML = value || '';
         } else {
             el.textContent = value || '';
         }
-    }
+    });
 }
 
 function syncBillToToShipToPreview() {
@@ -1164,14 +1163,15 @@ function syncBillToToShipToPreview() {
     const preview = document.getElementById('invoicePreview');
     billToShipFields.forEach(([sourceId, targetId]) => {
         const source = document.getElementById(sourceId);
-        const target = preview?.querySelector(`#${targetId}`);
-        if (source && target) target.textContent = getFieldVal(sourceId);
+        const targets = preview?.querySelectorAll(`#${targetId}`) || [];
+        if (source) targets.forEach(target => { target.textContent = getFieldVal(sourceId); });
     });
 
     const selectedState = document.getElementById('buyerState');
-    const stateName = preview?.querySelector('#preview-ship-to-state-name');
-    if (selectedState && stateName && selectedState.selectedIndex >= 0) {
-        stateName.textContent = selectedState.options[selectedState.selectedIndex].text.toUpperCase();
+    const stateNames = preview?.querySelectorAll('#preview-ship-to-state-name') || [];
+    if (selectedState && stateNames.length && selectedState.selectedIndex >= 0) {
+        const stateName = selectedState.options[selectedState.selectedIndex].text.toUpperCase();
+        stateNames.forEach(el => { el.textContent = stateName; });
     }
 }
 
@@ -1482,10 +1482,10 @@ async function generatePDF(copyType, { returnBlob = false } = {}) {
         pageWrapper.className = 'pdf-page'; // Use class for CSS-based breaks
         pageWrapper.style.cssText = `
             width: 210mm; 
-            /* Leave a small tolerance below A4 to prevent html2pdf's pixel rounding
-               from spilling an otherwise single-page copy onto a blank page. */
+            /* Keep each copy on one A4 canvas page with a small rounding tolerance. */
+            height: 296mm;
             min-height: 296mm;
-            overflow: visible;
+            overflow: hidden;
             padding: 8mm;
             margin: 0 auto; 
             background: #ffffff; 
@@ -1562,6 +1562,29 @@ async function generatePDF(copyType, { returnBlob = false } = {}) {
     }
 
         const target = frameDoc.getElementById('pdf-render-target');
+
+        // Invoice rows and customer supplied text can make a copy taller than A4.
+        // Fit each copy into its own page before html2pdf paginates the combined
+        // target, so overflow cannot create a spill page or a trailing blank page.
+        target.querySelectorAll?.('.pdf-page').forEach(page => {
+            const invoice = page.querySelector('.invoice-container');
+            if (!invoice) return;
+
+            const pageStyle = frameDoc.defaultView.getComputedStyle(page);
+            const availableWidth = page.clientWidth -
+                parseFloat(pageStyle.paddingLeft) - parseFloat(pageStyle.paddingRight);
+            const availableHeight = page.clientHeight -
+                parseFloat(pageStyle.paddingTop) - parseFloat(pageStyle.paddingBottom);
+            const naturalWidth = invoice.scrollWidth;
+            const naturalHeight = invoice.scrollHeight;
+            if (!naturalWidth || !naturalHeight || !availableWidth || !availableHeight) return;
+
+            const scale = Math.min(1, availableWidth / naturalWidth, availableHeight / naturalHeight);
+            if (scale < 1) {
+                invoice.style.zoom = String(scale);
+                invoice.style.width = `${100 / scale}%`;
+            }
+        });
 
         const opt = {
             margin: 0,

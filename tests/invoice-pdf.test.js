@@ -7,6 +7,10 @@ const vm = require('node:vm');
 const projectRoot = path.join(__dirname, '..');
 const scriptSource = fs.readFileSync(path.join(projectRoot, 'script.js'), 'utf8');
 const styleSource = fs.readFileSync(path.join(projectRoot, 'style.css'), 'utf8');
+const previewSyncStart = scriptSource.indexOf('function updatePreviewText(');
+const previewSyncEnd = scriptSource.indexOf('function syncBillToToShipToPreview(', previewSyncStart);
+assert.ok(previewSyncStart >= 0 && previewSyncEnd > previewSyncStart, 'preview text sync function should be present');
+const previewSyncSource = scriptSource.slice(previewSyncStart, previewSyncEnd);
 const functionStart = scriptSource.indexOf('async function generatePDF(');
 const functionEnd = scriptSource.indexOf('async function saveToHistory', functionStart);
 assert.ok(functionStart >= 0 && functionEnd > functionStart, 'generatePDF function should be present');
@@ -111,6 +115,26 @@ function createPDFHarness({ generatorAvailable = true, failGeneration = false } 
     return { sandbox, writtenDocuments, generatedOptions, getIframeCount: () => iframeCount, getActiveIframes: () => activeIframes };
 }
 
+test('invoice fields update matching preview elements in every invoice layout', () => {
+    const addressElements = [{ innerHTML: '', textContent: '' }, { innerHTML: '', textContent: '' }];
+    const gstElements = [{ innerHTML: '', textContent: '' }, { innerHTML: '', textContent: '' }];
+    const preview = {
+        querySelectorAll(selector) {
+            if (selector === '#preview-bill-to-address, #p-bill-to-address') return addressElements;
+            if (selector === '#preview-bill-to-gst, #p-bill-to-gst') return gstElements;
+            return [];
+        }
+    };
+    const sandbox = { document: { getElementById: id => id === 'invoicePreview' ? preview : null } };
+    vm.runInNewContext(`${previewSyncSource}\nglobalThis.runUpdatePreviewText = updatePreviewText;`, sandbox);
+
+    sandbox.runUpdatePreviewText('bill-to-address', '12 Main Street', true);
+    sandbox.runUpdatePreviewText('bill-to-gst', '27ABCDE1234F1Z5');
+
+    assert.deepEqual(addressElements.map(el => el.innerHTML), ['12 Main Street', '12 Main Street']);
+    assert.deepEqual(gstElements.map(el => el.textContent), ['27ABCDE1234F1Z5', '27ABCDE1234F1Z5']);
+});
+
 test('each individual copy keeps its label and gets an uncut, flowing PDF page', async () => {
     const copyTypes = [
         'ORIGINAL FOR RECIPIENT',
@@ -124,9 +148,9 @@ test('each individual copy keeps its label and gets an uncut, flowing PDF page',
         assert.equal(blob.type, 'application/pdf');
         assert.ok(blob.size > 0);
         assert.match(harness.writtenDocuments[0], new RegExp(`\\(${copyType}\\)`));
-        assert.match(harness.writtenDocuments[0], /overflow: visible/);
-        assert.match(harness.writtenDocuments[0], /min-height:\s*296mm/);
-        assert.doesNotMatch(harness.writtenDocuments[0], /min-height:\s*297mm|overflow: hidden/);
+        assert.match(harness.writtenDocuments[0], /height:\s*296mm;\s*min-height:\s*296mm;\s*overflow:\s*hidden/);
+        assert.match(generatePDFSource, /overflow:\s*visible\s*!important/);
+        assert.match(generatePDFSource, /availableHeight\s*\/\s*naturalHeight/);
         assert.match(harness.writtenDocuments[0], /\.pdf-page \+ \.pdf-page\s*\{\s*break-before:\s*page;\s*page-break-before:\s*always;/);
         assert.doesNotMatch(harness.writtenDocuments[0], /\.pdf-page\s*\{[^}]*page-break-after:\s*always/);
         assert.deepEqual(Array.from(harness.generatedOptions[0].pagebreak.avoid), ['tr']);
