@@ -1450,9 +1450,12 @@ async function generatePDF(copyType, { returnBlob = false } = {}) {
 
     // 1. Create a hidden iframe for 100% style and layout isolation
     const iframe = document.createElement('iframe');
-    // Hide but keep it "visible" to the browser for rendering
+    // Give the isolated document an A4-sized viewport. If it inherits the
+    // device viewport, mobile media queries can reflow the invoice even
+    // though the PDF page itself is A4.
     iframe.style.cssText = `
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        position: fixed; top: 0; left: 0; width: 210mm; height: 297mm;
+        max-width: none;
         visibility: hidden; pointer-events: none; z-index: -9999;
     `;
     try {

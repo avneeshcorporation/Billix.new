@@ -160,6 +160,11 @@ test('each individual copy keeps its label and gets an uncut, flowing PDF page',
     }
 });
 
+test('PDF rendering uses an A4 viewport so device breakpoints cannot reflow invoice templates', () => {
+    assert.match(generatePDFSource, /width:\s*210mm;\s*height:\s*297mm;/);
+    assert.match(generatePDFSource, /max-width:\s*none;/);
+});
+
 test('combined download creates Original, Duplicate, and Supplier copies in order', async () => {
     const harness = createPDFHarness();
     await harness.sandbox.runGeneratePDF('ALL', { returnBlob: true });
