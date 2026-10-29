@@ -16,8 +16,12 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
-// Serve the frontend and API from one Render web service.
-app.get('/', (req, res) => res.sendFile(path.join(frontendDirectory, 'index.html')));
+// Locally Express serves the frontend. On Vercel, public/ assets are served by
+// Vercel's CDN, so leave the root path to the static index.html file there.
+if (process.env.VERCEL !== '1') {
+    app.get('/', (req, res) => res.sendFile(path.join(frontendDirectory, 'index.html')));
+    app.use(express.static(frontendDirectory));
+}
 app.use((req, res, next) => {
     if (/^\/(?:node_modules|models|postman|\.git)(?:\/|$)/i.test(req.path) ||
         /^\/(?:server\.js|package(?:-lock)?\.json|\.env(?:\.|$))/i.test(req.path)) {
@@ -25,8 +29,6 @@ app.use((req, res, next) => {
     }
     next();
 });
-app.use(express.static(frontendDirectory));
-
 // Sequelize keeps a small connection pool for reuse between local requests and
 // warm Vercel function invocations. On the first database-backed API request,
 // plain sync creates missing tables only; it never alters or drops existing
@@ -47,6 +49,9 @@ function ensureDatabaseReady() {
 app.use('/api', (req, res, next) => {
     // This endpoint validates spreadsheet data without reading or writing DB.
     if (req.path === '/ledgers/import/validate') return next();
+    if (!process.env.DATABASE_URL) {
+        return res.status(503).json({ error: 'Database is not configured' });
+    }
 
     ensureDatabaseReady()
         .then(() => next())

@@ -1,14 +1,14 @@
 const { Sequelize } = require('sequelize');
 
 const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) {
-  throw new Error('DATABASE_URL must be configured before using the database.');
-}
-
-const sslMode = new URL(databaseUrl).searchParams.get('sslmode');
+// Use a harmless local placeholder so the Vercel app can still load and serve
+// its static frontend when DATABASE_URL has not been configured yet. API
+// requests check for the real value before attempting a database connection.
+const sequelizeUrl = databaseUrl || 'postgres://localhost:5432/billix';
+const sslMode = databaseUrl ? new URL(databaseUrl).searchParams.get('sslmode') : null;
 const sslRequired = process.env.VERCEL === '1' || ['require', 'verify-ca', 'verify-full'].includes(sslMode);
 
-const sequelize = new Sequelize(databaseUrl, {
+const sequelize = new Sequelize(sequelizeUrl, {
   dialect: 'postgres',
   logging: false,
   dialectOptions: sslRequired ? {
