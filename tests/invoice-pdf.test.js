@@ -5,8 +5,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const projectRoot = path.join(__dirname, '..');
-const scriptSource = fs.readFileSync(path.join(projectRoot, 'script.js'), 'utf8');
-const styleSource = fs.readFileSync(path.join(projectRoot, 'style.css'), 'utf8');
+const scriptSource = fs.readFileSync(path.join(projectRoot, 'frontend', 'script.js'), 'utf8');
+const styleSource = fs.readFileSync(path.join(projectRoot, 'frontend', 'style.css'), 'utf8');
 const previewSyncStart = scriptSource.indexOf('function updatePreviewText(');
 const previewSyncEnd = scriptSource.indexOf('function syncBillToToShipToPreview(', previewSyncStart);
 assert.ok(previewSyncStart >= 0 && previewSyncEnd > previewSyncStart, 'preview text sync function should be present');

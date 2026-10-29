@@ -1,12 +1,14 @@
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
-
-const sequelize = require('./models/db');
-const Invoice = require('./models/Invoice');
-const Query = require('./models/Query');
-const Ledger = require('./models/Ledger');
-const LedgerDownloadRequest = require('./models/LedgerDownloadRequest');
+const path = require('path');
+const projectRoot = path.resolve(__dirname, '..');
+const frontendDirectory = path.join(projectRoot, 'frontend');
+require('dotenv').config({ path: path.join(projectRoot, '.env') });
+const sequelize = require('../database/models/db');
+const Invoice = require('../database/models/Invoice');
+const Query = require('../database/models/Query');
+const Ledger = require('../database/models/Ledger');
+const LedgerDownloadRequest = require('../database/models/LedgerDownloadRequest');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -15,7 +17,7 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 // Serve the frontend and API from one Render web service.
-app.get('/', (req, res) => res.sendFile(require('path').join(__dirname, 'index.html')));
+app.get('/', (req, res) => res.sendFile(path.join(frontendDirectory, 'index.html')));
 app.use((req, res, next) => {
     if (/^\/(?:node_modules|models|postman|\.git)(?:\/|$)/i.test(req.path) ||
         /^\/(?:server\.js|package(?:-lock)?\.json|\.env(?:\.|$))/i.test(req.path)) {
@@ -23,16 +25,11 @@ app.use((req, res, next) => {
     }
     next();
 });
-app.use(express.static(__dirname));
+app.use(express.static(frontendDirectory));
 
-// Postgres connection and sync
-sequelize.authenticate()
-    .then(() => {
-        console.log('Postgres connected successfully');
-        return sequelize.sync({ alter: true }); // Automatically updates schema
-    })
-    .then(() => console.log('Database synced'))
-    .catch(err => console.error('Postgres connection error:', err));
+// Sequelize keeps a small connection pool for reuse between local requests and
+// warm Vercel function invocations. Schema changes are handled explicitly via
+// `npm run db:setup`, never during application startup.
 
 // --- Invoices API ---
 
@@ -348,7 +345,11 @@ app.get('/api/ledgers/download-requests', async (req, res) => {
     }
 });
 
-// Start the server
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+// Vercel imports the Express app; local development starts the HTTP listener.
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+    });
+}
+
+module.exports = app;

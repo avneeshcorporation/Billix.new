@@ -2,9 +2,11 @@
   "name": "billix-v.3",
   "version": "1.0.0",
   "description": "",
-  "main": "script.js",
+  "main": "backend/server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node backend/server.js",
+    "build": "node scripts/build-vercel-assets.js",
+    "db:setup": "node database/setup.js",
     "test": "node --test tests/invoice-pdf.test.js"
   },
   "keywords": [],
