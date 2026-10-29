@@ -28,8 +28,33 @@ app.use((req, res, next) => {
 app.use(express.static(frontendDirectory));
 
 // Sequelize keeps a small connection pool for reuse between local requests and
-// warm Vercel function invocations. Schema changes are handled explicitly via
-// `npm run db:setup`, never during application startup.
+// warm Vercel function invocations. On the first database-backed API request,
+// plain sync creates missing tables only; it never alters or drops existing
+// tables. Concurrent requests in the same function instance share this promise.
+let databaseReady;
+function ensureDatabaseReady() {
+    if (!databaseReady) {
+        databaseReady = sequelize.authenticate()
+            .then(() => sequelize.sync())
+            .catch(error => {
+                databaseReady = null;
+                throw error;
+            });
+    }
+    return databaseReady;
+}
+
+app.use('/api', (req, res, next) => {
+    // This endpoint validates spreadsheet data without reading or writing DB.
+    if (req.path === '/ledgers/import/validate') return next();
+
+    ensureDatabaseReady()
+        .then(() => next())
+        .catch(error => {
+            console.error('Database initialization failed:', error.name);
+            res.status(503).json({ error: 'Database unavailable' });
+        });
+});
 
 // --- Invoices API ---
 
