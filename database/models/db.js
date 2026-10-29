@@ -1,4 +1,7 @@
 const { Sequelize } = require('sequelize');
+// Sequelize loads the PostgreSQL driver dynamically. Keep a direct import so
+// Vercel's function tracer includes this runtime dependency in the bundle.
+require('pg');
 
 const databaseUrl = process.env.DATABASE_URL;
 // Use a harmless local placeholder so the Vercel app can still load and serve
